@@ -41,6 +41,7 @@ export interface SignalInsight {
   laNinaEffect?: string;
   hurricaneEffect?: string;
   brazilDroughtEffect?: string;
+  rsiEffect?: string;
 }
 
 export interface MarketContextParams {
@@ -81,11 +82,17 @@ const BRAZIL_DROUGHT_THRESHOLD = -1.5;
 const BRAZIL_DROUGHT_MONTHS = [8, 9, 10]; // Aug, Sep, Oct
 const MAX_WIN_PROBABILITY = 0.95;
 
+// RSI thresholds
+const RSI_OVERBOUGHT_THRESHOLD = 70;
+const TEMP_RECOVERY_THRESHOLD = 35;
+const RSI_TAKE_PROFIT_WIN_RATE = 0.72;
+
 export interface MarketSignalResultWithInsight extends MarketSignalResult {
   insight: SignalInsight;
   isHurricaneFalseAlarm: boolean;
   isLaNinaActive: boolean;
   isBrazilDrought: boolean;
+  isRsiOverbought: boolean;
 }
 
 /**
@@ -97,13 +104,15 @@ export interface MarketSignalResultWithInsight extends MarketSignalResult {
  * @param hoursBelow28 - Number of hours temperature has been below 28°F
  * @param currentInventory - Current inventory in millions (e.g., 30 for 30M)
  * @param marketContext - Optional market context parameters (La Niña, Hurricane, Brazil)
+ * @param rsiValue - Optional RSI (14-day) value for overbought/oversold detection
  * @returns MarketSignalResultWithInsight with win probability, recommended action, and insight
  */
 export function calculateMarketSignalBrowser(
   currentTemp: number,
   hoursBelow28: number,
   currentInventory: number,
-  marketContext?: MarketContextParams
+  marketContext?: MarketContextParams,
+  rsiValue: number = 50
 ): MarketSignalResultWithInsight {
   const { frost_rule, inventory_multipliers, win_rates } = MARKET_RULES;
 
@@ -131,12 +140,35 @@ export function calculateMarketSignalBrowser(
       isHurricaneFalseAlarm: false,
       isLaNinaActive: context.isLaNina,
       isBrazilDrought: true,
+      isRsiOverbought: false,
       insight: {
         frostCondition: "Brazil drought override active - frost conditions bypassed",
         inventoryCondition: "Brazil drought override active - inventory conditions bypassed",
         multiplierApplied: 1.0,
         baseWinRate: BRAZIL_DROUGHT_WIN_RATE,
         brazilDroughtEffect: `Brazil SPI-3 at ${context.brazilRainfallIndex.toFixed(1)} (< ${BRAZIL_DROUGHT_THRESHOLD}) during peak season. Historical win rate: ${BRAZIL_DROUGHT_WIN_RATE * 100}%`,
+      },
+    };
+  }
+
+  // Check for RSI Overbought + Temperature Recovery (Take Profit Signal)
+  const isRsiOverbought = rsiValue > RSI_OVERBOUGHT_THRESHOLD;
+  const isTempRecovered = currentTemp > TEMP_RECOVERY_THRESHOLD;
+
+  if (isRsiOverbought && isTempRecovered) {
+    return {
+      winProbability: RSI_TAKE_PROFIT_WIN_RATE,
+      recommendedAction: "TAKE PROFIT / SELL",
+      isHurricaneFalseAlarm: false,
+      isLaNinaActive: context.isLaNina,
+      isBrazilDrought: false,
+      isRsiOverbought: true,
+      insight: {
+        frostCondition: `Temperature recovered to ${currentTemp}°F (above ${TEMP_RECOVERY_THRESHOLD}°F threshold)`,
+        inventoryCondition: "RSI signal override active - inventory conditions secondary",
+        multiplierApplied: 1.0,
+        baseWinRate: RSI_TAKE_PROFIT_WIN_RATE,
+        rsiEffect: `Market is overbought (RSI ${rsiValue} > ${RSI_OVERBOUGHT_THRESHOLD}) and temperature has recovered. Risk of price correction is high.`,
       },
     };
   }
@@ -149,6 +181,7 @@ export function calculateMarketSignalBrowser(
       isHurricaneFalseAlarm: true,
       isLaNinaActive: context.isLaNina,
       isBrazilDrought: false,
+      isRsiOverbought: false,
       insight: {
         frostCondition: "Hurricane override active - frost conditions bypassed",
         inventoryCondition: "Hurricane override active - inventory conditions bypassed",
@@ -241,12 +274,21 @@ export function calculateMarketSignalBrowser(
     brazilDroughtEffect = `Brazil SPI-3 at ${context.brazilRainfallIndex.toFixed(1)} - drought conditions noted but outside Aug-Oct window`;
   }
 
+  // RSI info (when not triggering take profit)
+  let rsiEffect: string | undefined;
+  if (rsiValue > RSI_OVERBOUGHT_THRESHOLD) {
+    rsiEffect = `RSI at ${rsiValue} (overbought) - watch for temperature recovery above ${TEMP_RECOVERY_THRESHOLD}°F to trigger take profit`;
+  } else if (rsiValue < 30) {
+    rsiEffect = `RSI at ${rsiValue} (oversold) - potential buying opportunity if fundamentals align`;
+  }
+
   return {
     winProbability: Math.round(winProbability * 100) / 100,
     recommendedAction,
     isHurricaneFalseAlarm: false,
     isLaNinaActive: context.isLaNina,
     isBrazilDrought: false,
+    isRsiOverbought: isRsiOverbought,
     insight: {
       frostCondition,
       inventoryCondition,
@@ -255,6 +297,7 @@ export function calculateMarketSignalBrowser(
       laNinaEffect,
       hurricaneEffect,
       brazilDroughtEffect,
+      rsiEffect,
     },
   };
 }

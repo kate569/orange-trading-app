@@ -1029,16 +1029,19 @@ interface SignalGaugeProps {
   action: string;
   isHurricaneFalseAlarm: boolean;
   isBrazilDrought: boolean;
+  isRsiOverbought: boolean;
 }
 
 const SignalGauge: React.FC<SignalGaugeProps> = ({
   action,
   isHurricaneFalseAlarm,
   isBrazilDrought,
+  isRsiOverbought,
 }) => {
   // Determine accent color based on signal type
   const getAccentColor = () => {
     if (isHurricaneFalseAlarm) return "#ef4444"; // Red for short
+    if (isRsiOverbought) return "#eab308"; // Yellow for take profit
     if (isBrazilDrought) return "#a855f7"; // Purple for Brazil drought
     return "#ff8c00"; // Orange default
   };
@@ -1074,6 +1077,11 @@ const SignalGauge: React.FC<SignalGaugeProps> = ({
       {isBrazilDrought && (
         <div className="mt-2 text-purple-400 text-xs uppercase tracking-wider">
           🌾 Brazil Supply Crisis
+        </div>
+      )}
+      {isRsiOverbought && (
+        <div className="mt-2 text-yellow-400 text-xs uppercase tracking-wider">
+          📊 RSI Overbought - Take Profit Signal
         </div>
       )}
     </div>
@@ -1223,6 +1231,12 @@ const LogicInsight: React.FC<LogicInsightProps> = ({ insight }) => {
           <div className="flex items-start gap-2">
             <span className="text-purple-400">🌾</span>
             <span className="text-purple-300">{insight.brazilDroughtEffect}</span>
+          </div>
+        )}
+        {insight.rsiEffect && (
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-400">📊</span>
+            <span className="text-yellow-300">{insight.rsiEffect}</span>
           </div>
         )}
         <div className="mt-3 pt-3 border-t border-slate-700 text-slate-400">
@@ -1451,9 +1465,10 @@ export const PredictorDashboard: React.FC = () => {
       currentTemp,
       hoursBelow28,
       currentInventory,
-      marketContext
+      marketContext,
+      rsiValue
     );
-  }, [currentTemp, hoursBelow28, currentInventory, marketContext]);
+  }, [currentTemp, hoursBelow28, currentInventory, marketContext, rsiValue]);
 
   // Generate blueprint data
   const currentBlueprintData = useMemo((): TradeBlueprintData => {
@@ -1706,6 +1721,11 @@ export const PredictorDashboard: React.FC = () => {
                 🌾 Brazil Drought
               </span>
             )}
+            {signal.isRsiOverbought && (
+              <span className="px-2 py-1 text-xs font-semibold bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30">
+                📊 RSI Overbought
+              </span>
+            )}
           </div>
           <p className="text-slate-400 mt-2">
             Orange Juice Futures Trading Analysis
@@ -1828,6 +1848,7 @@ export const PredictorDashboard: React.FC = () => {
                 action={signal.recommendedAction}
                 isHurricaneFalseAlarm={signal.isHurricaneFalseAlarm}
                 isBrazilDrought={signal.isBrazilDrought}
+                isRsiOverbought={signal.isRsiOverbought}
               />
 
               {/* Brazil Drought Warning */}
