@@ -13,16 +13,30 @@ import {
   getFrostRiskLevel,
 } from "../services/marketDataStream";
 
-// localStorage keys for frost tracker persistence
+// localStorage keys for persistence
 const FROST_STORAGE_KEY = "oj_frost_tracker";
+const MARKET_DATA_STORAGE_KEY = "oj_market_data";
+const RSI_STORAGE_KEY = "oj_rsi_value";
 const CRITICAL_FROST_HOURS = 4;
 const CRITICAL_TEMP_THRESHOLD = 28;
 const RESET_TEMP_THRESHOLD = 32;
+const STALE_DATA_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
 interface FrostTrackerData {
   accumulatedSeconds: number;
   lastUpdateTime: number;
   isTracking: boolean;
+}
+
+// Persisted market data interface
+interface PersistedMarketData {
+  currentTemp: number;
+  currentInventory: number;
+  hoursBelow28: number;
+  marketContext: MarketContextParams;
+  weatherData: WeatherData | null;
+  lastSyncTimestamp: number;
+  lastSyncTimeFormatted: string;
 }
 
 // Trade Blueprint data interface
@@ -69,6 +83,58 @@ function saveFrostData(data: FrostTrackerData): void {
   } catch (e) {
     console.error("Failed to save frost data:", e);
   }
+}
+
+// Helper to load market data from localStorage
+function loadMarketData(): PersistedMarketData | null {
+  try {
+    const stored = localStorage.getItem(MARKET_DATA_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored) as PersistedMarketData;
+    }
+  } catch (e) {
+    console.error("Failed to load market data:", e);
+  }
+  return null;
+}
+
+// Helper to save market data to localStorage
+function saveMarketData(data: PersistedMarketData): void {
+  try {
+    localStorage.setItem(MARKET_DATA_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error("Failed to save market data:", e);
+  }
+}
+
+// Helper to load RSI value from localStorage
+function loadRsiValue(): number {
+  try {
+    const stored = localStorage.getItem(RSI_STORAGE_KEY);
+    if (stored) {
+      const value = parseInt(stored, 10);
+      if (!isNaN(value) && value >= 0 && value <= 100) {
+        return value;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to load RSI value:", e);
+  }
+  return 50; // Default value
+}
+
+// Helper to save RSI value to localStorage
+function saveRsiValue(value: number): void {
+  try {
+    localStorage.setItem(RSI_STORAGE_KEY, value.toString());
+  } catch (e) {
+    console.error("Failed to save RSI value:", e);
+  }
+}
+
+// Helper to check if data is stale (older than 30 minutes)
+function isDataStale(lastSyncTimestamp: number): boolean {
+  return Date.now() - lastSyncTimestamp > STALE_DATA_THRESHOLD_MS;
 }
 
 // Helper to format seconds as "Xh Ym Zs"
@@ -894,12 +960,14 @@ interface SyncButtonProps {
   onClick: () => void;
   isLoading: boolean;
   lastSync?: string;
+  isStale?: boolean;
 }
 
 const SyncButton: React.FC<SyncButtonProps> = ({
   onClick,
   isLoading,
   lastSync,
+  isStale = false,
 }) => {
   return (
     <div className="mb-6">
@@ -911,9 +979,13 @@ const SyncButton: React.FC<SyncButtonProps> = ({
         style={{
           background: isLoading
             ? "linear-gradient(135deg, #475569 0%, #334155 100%)"
+            : isStale
+            ? "linear-gradient(135deg, #ca8a04 0%, #a16207 100%)"
             : "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
           boxShadow: isLoading
             ? "none"
+            : isStale
+            ? "0 0 20px rgba(202, 138, 4, 0.3)"
             : "0 0 20px rgba(34, 197, 94, 0.3)",
         }}
       >
@@ -960,9 +1032,21 @@ const SyncButton: React.FC<SyncButtonProps> = ({
         )}
       </button>
       {lastSync && (
-        <p className="text-center text-slate-500 text-xs mt-2">
-          Last synced: {lastSync}
-        </p>
+        <div className="text-center mt-2">
+          <p
+            className={`text-xs ${
+              isStale ? "text-yellow-400 font-semibold" : "text-slate-500"
+            }`}
+          >
+            Last synced: {lastSync}
+            {isStale && " ⚠️"}
+          </p>
+          {isStale && (
+            <p className="text-yellow-500 text-xs mt-1">
+              ⚠️ Stale Data - Last sync was over 30 minutes ago
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -1356,26 +1440,44 @@ const StrategySummaryTable: React.FC = () => {
 };
 
 export const PredictorDashboard: React.FC = () => {
-  const [currentTemp, setCurrentTemp] = useState<number>(32);
-  const [hoursBelow28, setHoursBelow28] = useState<number>(0);
-  const [currentInventory, setCurrentInventory] = useState<number>(45);
-  const [marketContext, setMarketContext] = useState<MarketContextParams>({
-    isLaNina: false,
-    isHurricaneActive: false,
-    hurricaneCenterFarFromPolk: false,
-    brazilRainfallIndex: 0,
-    currentMonth: new Date().getMonth() + 1,
-  });
+  // Load persisted market data on initial render
+  const persistedData = useMemo(() => loadMarketData(), []);
+
+  const [currentTemp, setCurrentTemp] = useState<number>(
+    persistedData?.currentTemp ?? 32
+  );
+  const [hoursBelow28, setHoursBelow28] = useState<number>(
+    persistedData?.hoursBelow28 ?? 0
+  );
+  const [currentInventory, setCurrentInventory] = useState<number>(
+    persistedData?.currentInventory ?? 45
+  );
+  const [marketContext, setMarketContext] = useState<MarketContextParams>(
+    persistedData?.marketContext ?? {
+      isLaNina: false,
+      isHurricaneActive: false,
+      hurricaneCenterFarFromPolk: false,
+      brazilRainfallIndex: 0,
+      currentMonth: new Date().getMonth() + 1,
+    }
+  );
 
   // Sync state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string | undefined>();
+  const [lastSyncTime, setLastSyncTime] = useState<string | undefined>(
+    persistedData?.lastSyncTimeFormatted
+  );
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(
+    persistedData?.lastSyncTimestamp ?? 0
+  );
   const [showToast, setShowToast] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string>("Data Synced");
   const [toastVariant, setToastVariant] = useState<"success" | "info">("success");
 
   // Weather data state
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(
+    persistedData?.weatherData ?? null
+  );
 
   // Frost duration tracker state
   const [frostData, setFrostData] = useState<FrostTrackerData>(() => loadFrostData());
@@ -1386,8 +1488,19 @@ export const PredictorDashboard: React.FC = () => {
   const [showBlueprintModal, setShowBlueprintModal] = useState<boolean>(false);
   const [blueprintData, setBlueprintData] = useState<TradeBlueprintData | null>(null);
 
-  // RSI state
-  const [rsiValue, setRsiValue] = useState<number>(50);
+  // RSI state - load from localStorage
+  const [rsiValue, setRsiValue] = useState<number>(() => loadRsiValue());
+
+  // Check if data is stale
+  const dataIsStale = useMemo(
+    () => lastSyncTimestamp > 0 && isDataStale(lastSyncTimestamp),
+    [lastSyncTimestamp]
+  );
+
+  // Save RSI value to localStorage when it changes
+  useEffect(() => {
+    saveRsiValue(rsiValue);
+  }, [rsiValue]);
 
   // Background timer for frost tracking
   useEffect(() => {
@@ -1518,6 +1631,8 @@ export const PredictorDashboard: React.FC = () => {
     setIsSyncing(true);
     try {
       const response: LiveWeatherResponse = await fetchLiveMarketData();
+      const syncTimestamp = Date.now();
+      const syncTimeFormatted = formatSyncTime(response.marketData.timestamp);
 
       // Update weather data
       setWeatherData(response.weather);
@@ -1525,16 +1640,33 @@ export const PredictorDashboard: React.FC = () => {
       // Update sliders with live data
       setCurrentTemp(response.marketData.currentTemp);
       setCurrentInventory(response.marketData.inventory);
-      setMarketContext((prev) => ({
-        ...prev,
+      
+      const updatedMarketContext = {
+        ...marketContext,
         isHurricaneActive: response.marketData.isHurricaneAlert,
         hurricaneCenterFarFromPolk: response.marketData.isHurricaneAlert
-          ? prev.hurricaneCenterFarFromPolk
+          ? marketContext.hurricaneCenterFarFromPolk
           : false,
-      }));
+      };
+      setMarketContext(updatedMarketContext);
 
-      // Update last sync time and show toast
-      setLastSyncTime(formatSyncTime(response.marketData.timestamp));
+      // Update last sync time
+      setLastSyncTime(syncTimeFormatted);
+      setLastSyncTimestamp(syncTimestamp);
+
+      // Save to localStorage for persistence
+      const dataToSave: PersistedMarketData = {
+        currentTemp: response.marketData.currentTemp,
+        currentInventory: response.marketData.inventory,
+        hoursBelow28,
+        marketContext: updatedMarketContext,
+        weatherData: response.weather,
+        lastSyncTimestamp: syncTimestamp,
+        lastSyncTimeFormatted: syncTimeFormatted,
+      };
+      saveMarketData(dataToSave);
+
+      // Show success toast
       setToastMessage("Data Synced");
       setToastVariant("success");
       setShowToast(true);
@@ -1543,7 +1675,7 @@ export const PredictorDashboard: React.FC = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, []);
+  }, [marketContext, hoursBelow28]);
 
   // Handle generate blueprint
   const handleGenerateBlueprint = useCallback(() => {
@@ -1744,6 +1876,7 @@ export const PredictorDashboard: React.FC = () => {
               onClick={handleSyncLiveData}
               isLoading={isSyncing}
               lastSync={lastSyncTime}
+              isStale={dataIsStale}
             />
 
             {/* Live Weather Status Badge */}
