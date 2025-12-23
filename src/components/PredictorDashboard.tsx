@@ -1637,29 +1637,25 @@ export const PredictorDashboard: React.FC = () => {
       // Update weather data
       setWeatherData(response.weather);
 
-      // Update sliders with live data
+      // Only update temperature from live weather data
+      // Inventory and Hurricane settings are manual controls - don't override them
       setCurrentTemp(response.marketData.currentTemp);
-      setCurrentInventory(response.marketData.inventory);
       
-      const updatedMarketContext = {
-        ...marketContext,
-        isHurricaneActive: response.marketData.isHurricaneAlert,
-        hurricaneCenterFarFromPolk: response.marketData.isHurricaneAlert
-          ? marketContext.hurricaneCenterFarFromPolk
-          : false,
-      };
-      setMarketContext(updatedMarketContext);
+      // Keep current market context unchanged (inventory slider, hurricane toggle are manual)
+      // Only the temperature is updated from the API
 
       // Update last sync time
       setLastSyncTime(syncTimeFormatted);
       setLastSyncTimestamp(syncTimestamp);
 
       // Save to localStorage for persistence
+      // Note: We save current inventory and market context (not from API response)
+      // since those are manual controls that shouldn't be overwritten
       const dataToSave: PersistedMarketData = {
         currentTemp: response.marketData.currentTemp,
-        currentInventory: response.marketData.inventory,
+        currentInventory, // Use current slider value, not API response
         hoursBelow28,
-        marketContext: updatedMarketContext,
+        marketContext, // Use current context, not overwritten
         weatherData: response.weather,
         lastSyncTimestamp: syncTimestamp,
         lastSyncTimeFormatted: syncTimeFormatted,
@@ -1675,7 +1671,7 @@ export const PredictorDashboard: React.FC = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [marketContext, hoursBelow28]);
+  }, [marketContext, hoursBelow28, currentInventory]);
 
   // Handle generate blueprint
   const handleGenerateBlueprint = useCallback(() => {

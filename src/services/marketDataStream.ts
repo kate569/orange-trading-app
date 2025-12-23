@@ -138,26 +138,29 @@ export async function fetchWeatherData(): Promise<WeatherData> {
   }
 }
 
+// Fixed inventory value - represents current USDA/ICE reported inventory
+// In production, this would be fetched from USDA NASS or ICE exchange data
+const FIXED_INVENTORY_LEVEL = 27; // 27M gallons (realistic current level)
+
 /**
  * Fetches live market data including real weather
- * Combines real weather API data with simulated inventory data
+ * Uses real weather API data and fixed inventory (no random fluctuation)
+ * 
+ * Note: Inventory is fixed at 27M. In production, this would come from USDA/ICE.
+ * Hurricane alerts are disabled by default - use the manual toggle in the UI.
  */
 export async function fetchLiveMarketData(): Promise<LiveWeatherResponse> {
-  // Fetch real weather data
+  // Fetch real weather data from Open-Meteo API
   const weather = await fetchWeatherData();
 
-  // Simulate inventory levels (this would come from USDA/ICE data in production)
-  const inventoryBase = 35 + Math.random() * 20;
-  const inventoryVariance = (Math.random() - 0.5) * 30;
-  const inventory = Math.round(
-    Math.max(20, Math.min(70, inventoryBase + inventoryVariance))
-  );
+  // Use fixed inventory level (no random fluctuation)
+  // This value only changes when manually adjusted via slider
+  const inventory = FIXED_INVENTORY_LEVEL;
 
-  // Hurricane alert based on weather conditions (simplified)
-  // In production, this would check NHC/NOAA hurricane data
-  const isHurricaneAlert =
-    weather.weatherCode >= 95 || // Thunderstorm conditions
-    (weather.windSpeed > 40 && weather.weatherCode >= 80); // High winds + rain
+  // Hurricane alert is false by default
+  // User should manually toggle this based on NHC/NOAA hurricane advisories
+  // This prevents random alerts and keeps the system stable
+  const isHurricaneAlert = false;
 
   return {
     weather,
