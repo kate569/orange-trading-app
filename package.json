@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "description": "Market signal calculation based on frost and inventory rules",
-  "homepage": "https://your-username.github.io/orange-trading-app",
+  "homepage": "https://kate569.github.io/orange-trading-app",
   "main": "dist/calculateMarketSignal.js",
   "types": "dist/calculateMarketSignal.d.ts",
   "scripts": {
