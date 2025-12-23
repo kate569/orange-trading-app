@@ -1,0 +1,27 @@
+{
+  "theme": "Orange Juice Trading",
+  "frost_rule": {
+    "critical_temp_f": 28,
+    "min_duration_hours": 4,
+    "target_counties": ["Polk", "Highlands", "Lake"]
+  },
+  "inventory_multipliers": {
+    "under_35m": 2.0,
+    "35_45m": 1.5,
+    "over_55m": 0.7
+  },
+  "win_rates": {
+    "la_nina_double_hit": 0.79,
+    "volatility_pre_frost": 0.79,
+    "real_frost": 0.76
+  }
+}
+
+
+
+
+
+
+
+
+Initial core trading rules
