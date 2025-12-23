@@ -1,10 +1,15 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   calculateMarketSignalBrowser,
   MarketSignalResultWithInsight,
   MarketContextParams,
   STRATEGY_WIN_RATES,
 } from "../calculateMarketSignal.browser";
+import {
+  fetchLiveMarketData,
+  formatSyncTime,
+  LiveMarketData,
+} from "../services/marketDataStream";
 
 interface SliderControlProps {
   label: string;
@@ -148,6 +153,157 @@ const Checkbox: React.FC<CheckboxProps> = ({ label, checked, onChange }) => {
       />
       <span className="text-slate-400 text-sm">{label}</span>
     </label>
+  );
+};
+
+interface ToastProps {
+  message: string;
+  timestamp?: string;
+  isVisible: boolean;
+  onClose: () => void;
+}
+
+const Toast: React.FC<ToastProps> = ({
+  message,
+  timestamp,
+  isVisible,
+  onClose,
+}) => {
+  useEffect(() => {
+    if (isVisible) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isVisible, onClose]);
+
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 animate-slide-up">
+      <div
+        className="flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl"
+        style={{
+          backgroundColor: "rgba(34, 197, 94, 0.95)",
+          boxShadow: "0 0 20px rgba(34, 197, 94, 0.3)",
+        }}
+      >
+        <div className="flex items-center justify-center w-6 h-6 bg-white/20 rounded-full">
+          <svg
+            className="w-4 h-4 text-white"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        </div>
+        <div>
+          <p className="text-white font-semibold">{message}</p>
+          {timestamp && (
+            <p className="text-white/70 text-xs">Last sync: {timestamp}</p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="ml-2 text-white/70 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+interface SyncButtonProps {
+  onClick: () => void;
+  isLoading: boolean;
+  lastSync?: string;
+}
+
+const SyncButton: React.FC<SyncButtonProps> = ({
+  onClick,
+  isLoading,
+  lastSync,
+}) => {
+  return (
+    <div className="mb-6">
+      <button
+        onClick={onClick}
+        disabled={isLoading}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold
+                   text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{
+          background: isLoading
+            ? "linear-gradient(135deg, #475569 0%, #334155 100%)"
+            : "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+          boxShadow: isLoading
+            ? "none"
+            : "0 0 20px rgba(34, 197, 94, 0.3)",
+        }}
+      >
+        {isLoading ? (
+          <>
+            <svg
+              className="w-5 h-5 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span>Syncing...</span>
+          </>
+        ) : (
+          <>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            <span>Sync Live Data</span>
+          </>
+        )}
+      </button>
+      {lastSync && (
+        <p className="text-center text-slate-500 text-xs mt-2">
+          Last synced: {lastSync}
+        </p>
+      )}
+    </div>
   );
 };
 
@@ -536,6 +692,39 @@ export const PredictorDashboard: React.FC = () => {
     currentMonth: new Date().getMonth() + 1,
   });
 
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | undefined>();
+  const [showToast, setShowToast] = useState<boolean>(false);
+
+  // Handle live data sync
+  const handleSyncLiveData = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const liveData: LiveMarketData = await fetchLiveMarketData();
+
+      // Update all sliders with live data
+      setCurrentTemp(liveData.currentTemp);
+      setCurrentInventory(liveData.inventory);
+      setMarketContext((prev) => ({
+        ...prev,
+        isHurricaneActive: liveData.isHurricaneAlert,
+        // Reset the far-from-polk checkbox when hurricane status changes
+        hurricaneCenterFarFromPolk: liveData.isHurricaneAlert
+          ? prev.hurricaneCenterFarFromPolk
+          : false,
+      }));
+
+      // Update last sync time and show toast
+      setLastSyncTime(formatSyncTime(liveData.timestamp));
+      setShowToast(true);
+    } catch (error) {
+      console.error("Failed to sync live data:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
   // Calculate signal instantly as sliders move
   const signal = useMemo(() => {
     return calculateMarketSignalBrowser(
@@ -569,6 +758,31 @@ export const PredictorDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 p-8">
+      {/* Toast Notification */}
+      <Toast
+        message="Data Synced"
+        timestamp={lastSyncTime}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
+      {/* CSS for toast animation */}
+      <style>{`
+        @keyframes slide-up {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-slide-up {
+          animation: slide-up 0.3s ease-out;
+        }
+      `}</style>
+
       <div
         className="max-w-4xl mx-auto rounded-2xl p-6 transition-all duration-500"
         style={getDashboardBorderStyle()}
@@ -601,6 +815,13 @@ export const PredictorDashboard: React.FC = () => {
             <h2 className="text-lg font-semibold text-slate-200 mb-6 pb-4 border-b border-slate-700">
               Input Parameters
             </h2>
+
+            {/* Sync Live Data Button */}
+            <SyncButton
+              onClick={handleSyncLiveData}
+              isLoading={isSyncing}
+              lastSync={lastSyncTime}
+            />
 
             {/* Market Context Section */}
             <MarketContextSection

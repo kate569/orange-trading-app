@@ -7,3 +7,8 @@ export {
   STRATEGY_WIN_RATES,
 } from "./calculateMarketSignal.browser";
 export { PredictorDashboard } from "./components/PredictorDashboard";
+export {
+  fetchLiveMarketData,
+  formatSyncTime,
+  LiveMarketData,
+} from "./services/marketDataStream";
