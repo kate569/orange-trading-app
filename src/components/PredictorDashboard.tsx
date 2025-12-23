@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   calculateMarketSignalBrowser,
   MarketSignalResultWithInsight,
+  MarketContextParams,
 } from "../calculateMarketSignal.browser";
 
 interface SliderControlProps {
@@ -71,34 +72,172 @@ const SliderControl: React.FC<SliderControlProps> = ({
   );
 };
 
-interface SignalGaugeProps {
-  action: string;
+interface ToggleSwitchProps {
+  label: string;
+  sublabel?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  color?: "orange" | "blue" | "red";
 }
 
-const SignalGauge: React.FC<SignalGaugeProps> = ({ action }) => {
+const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
+  label,
+  sublabel,
+  checked,
+  onChange,
+  color = "orange",
+}) => {
+  const colorClasses = {
+    orange: "bg-[#ff8c00]",
+    blue: "bg-blue-500",
+    red: "bg-red-500",
+  };
+
+  return (
+    <label className="flex items-center justify-between cursor-pointer group">
+      <div>
+        <span className="text-slate-300 text-sm font-medium">{label}</span>
+        {sublabel && (
+          <span className="text-slate-500 text-xs ml-2">({sublabel})</span>
+        )}
+      </div>
+      <div className="relative">
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <div
+          className={`w-11 h-6 rounded-full transition-colors ${
+            checked ? colorClasses[color] : "bg-slate-600"
+          }`}
+        />
+        <div
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </div>
+    </label>
+  );
+};
+
+interface CheckboxProps {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+const Checkbox: React.FC<CheckboxProps> = ({ label, checked, onChange }) => {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer ml-4 mt-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-4 h-4 rounded border-slate-500 bg-slate-700 text-red-500 
+                   focus:ring-red-500 focus:ring-offset-slate-900"
+      />
+      <span className="text-slate-400 text-sm">{label}</span>
+    </label>
+  );
+};
+
+interface MarketContextSectionProps {
+  context: MarketContextParams;
+  onContextChange: (context: MarketContextParams) => void;
+}
+
+const MarketContextSection: React.FC<MarketContextSectionProps> = ({
+  context,
+  onContextChange,
+}) => {
+  return (
+    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 mb-6">
+      <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
+        Market Context
+      </h3>
+      <div className="space-y-4">
+        <ToggleSwitch
+          label="La Niña Active"
+          sublabel="ONI < -0.5"
+          checked={context.isLaNina}
+          onChange={(checked) =>
+            onContextChange({ ...context, isLaNina: checked })
+          }
+          color="blue"
+        />
+        <div>
+          <ToggleSwitch
+            label="Hurricane Warning"
+            checked={context.isHurricaneActive}
+            onChange={(checked) =>
+              onContextChange({
+                ...context,
+                isHurricaneActive: checked,
+                hurricaneCenterFarFromPolk: checked
+                  ? context.hurricaneCenterFarFromPolk
+                  : false,
+              })
+            }
+            color="red"
+          />
+          {context.isHurricaneActive && (
+            <Checkbox
+              label="Is center > 100 miles from Polk County?"
+              checked={context.hurricaneCenterFarFromPolk}
+              onChange={(checked) =>
+                onContextChange({
+                  ...context,
+                  hurricaneCenterFarFromPolk: checked,
+                })
+              }
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface SignalGaugeProps {
+  action: string;
+  isHurricaneFalseAlarm: boolean;
+}
+
+const SignalGauge: React.FC<SignalGaugeProps> = ({
+  action,
+  isHurricaneFalseAlarm,
+}) => {
+  const accentColor = isHurricaneFalseAlarm ? "#ef4444" : "#ff8c00";
+
   return (
     <div
-      className="relative p-6 rounded-xl text-center"
+      className="relative p-6 rounded-xl text-center transition-all duration-300"
       style={{
-        background:
-          "linear-gradient(135deg, rgba(255, 140, 0, 0.15) 0%, rgba(255, 140, 0, 0.05) 100%)",
-        border: "2px solid #ff8c00",
-        boxShadow:
-          "0 0 30px rgba(255, 140, 0, 0.3), 0 0 60px rgba(255, 140, 0, 0.1), inset 0 0 30px rgba(255, 140, 0, 0.05)",
+        background: `linear-gradient(135deg, ${accentColor}26 0%, ${accentColor}0d 100%)`,
+        border: `2px solid ${accentColor}`,
+        boxShadow: `0 0 30px ${accentColor}4d, 0 0 60px ${accentColor}1a, inset 0 0 30px ${accentColor}0d`,
       }}
     >
       <div className="text-slate-400 text-sm uppercase tracking-wider mb-2">
         Recommended Action
       </div>
       <div
-        className="text-3xl font-black uppercase tracking-wide"
+        className="text-3xl font-black uppercase tracking-wide transition-colors duration-300"
         style={{
-          color: "#ff8c00",
-          textShadow: "0 0 20px rgba(255, 140, 0, 0.5)",
+          color: accentColor,
+          textShadow: `0 0 20px ${accentColor}80`,
         }}
       >
         {action}
       </div>
+      {isHurricaneFalseAlarm && (
+        <div className="mt-2 text-red-400 text-xs uppercase tracking-wider">
+          ⚠️ Short Opportunity Detected
+        </div>
+      )}
     </div>
   );
 };
@@ -202,10 +341,23 @@ const LogicInsight: React.FC<LogicInsightProps> = ({ insight }) => {
           <span className="text-amber-400">📦</span>
           <span className="text-slate-300">{insight.inventoryCondition}</span>
         </div>
+        {insight.laNinaEffect && (
+          <div className="flex items-start gap-2">
+            <span className="text-blue-300">🌊</span>
+            <span className="text-blue-300">{insight.laNinaEffect}</span>
+          </div>
+        )}
+        {insight.hurricaneEffect && (
+          <div className="flex items-start gap-2">
+            <span className="text-red-400">🌀</span>
+            <span className="text-red-300">{insight.hurricaneEffect}</span>
+          </div>
+        )}
         <div className="mt-3 pt-3 border-t border-slate-700 text-slate-400">
           <span className="text-xs">
             Base win rate: {Math.round(insight.baseWinRate * 100)}% ×{" "}
             {insight.multiplierApplied}x multiplier
+            {insight.laNinaEffect && " × 1.4x La Niña"}
           </span>
         </div>
       </div>
@@ -217,25 +369,55 @@ export const PredictorDashboard: React.FC = () => {
   const [currentTemp, setCurrentTemp] = useState<number>(32);
   const [hoursBelow28, setHoursBelow28] = useState<number>(0);
   const [currentInventory, setCurrentInventory] = useState<number>(45);
+  const [marketContext, setMarketContext] = useState<MarketContextParams>({
+    isLaNina: false,
+    isHurricaneActive: false,
+    hurricaneCenterFarFromPolk: false,
+  });
 
   // Calculate signal instantly as sliders move
   const signal = useMemo(() => {
     return calculateMarketSignalBrowser(
       currentTemp,
       hoursBelow28,
-      currentInventory
+      currentInventory,
+      marketContext
     );
-  }, [currentTemp, hoursBelow28, currentInventory]);
+  }, [currentTemp, hoursBelow28, currentInventory, marketContext]);
+
+  // Dynamic border styling for La Niña effect
+  const getDashboardBorderStyle = () => {
+    if (signal.isLaNinaActive) {
+      return {
+        border: "1px solid rgba(59, 130, 246, 0.5)",
+        boxShadow:
+          "0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.1), inset 0 0 60px rgba(59, 130, 246, 0.03)",
+      };
+    }
+    return {
+      border: "1px solid rgb(30, 41, 59)",
+    };
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 p-8">
-      <div className="max-w-4xl mx-auto">
+      <div
+        className="max-w-4xl mx-auto rounded-2xl p-6 transition-all duration-500"
+        style={getDashboardBorderStyle()}
+      >
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Market Signal Predictor
-          </h1>
-          <p className="text-slate-400">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold text-white">
+              Market Signal Predictor
+            </h1>
+            {signal.isLaNinaActive && (
+              <span className="px-2 py-1 text-xs font-semibold bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
+                🌊 La Niña Active
+              </span>
+            )}
+          </div>
+          <p className="text-slate-400 mt-2">
             Orange Juice Futures Trading Analysis
           </p>
         </div>
@@ -246,6 +428,12 @@ export const PredictorDashboard: React.FC = () => {
             <h2 className="text-lg font-semibold text-slate-200 mb-6 pb-4 border-b border-slate-700">
               Input Parameters
             </h2>
+
+            {/* Market Context Section */}
+            <MarketContextSection
+              context={marketContext}
+              onContextChange={setMarketContext}
+            />
 
             <SliderControl
               label="Current Temperature"
@@ -283,7 +471,10 @@ export const PredictorDashboard: React.FC = () => {
 
             <div className="space-y-6">
               {/* Signal Gauge */}
-              <SignalGauge action={signal.recommendedAction} />
+              <SignalGauge
+                action={signal.recommendedAction}
+                isHurricaneFalseAlarm={signal.isHurricaneFalseAlarm}
+              />
 
               {/* Win Probability Meter */}
               <WinProbabilityMeter probability={signal.winProbability} />

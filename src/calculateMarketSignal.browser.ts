@@ -36,6 +36,14 @@ export interface SignalInsight {
   inventoryCondition: string;
   multiplierApplied: number;
   baseWinRate: number;
+  laNinaEffect?: string;
+  hurricaneEffect?: string;
+}
+
+export interface MarketContextParams {
+  isLaNina: boolean;
+  isHurricaneActive: boolean;
+  hurricaneCenterFarFromPolk: boolean;
 }
 
 // Embedded market rules (from constants/market_rules.json)
@@ -58,25 +66,59 @@ const MARKET_RULES: MarketRules = {
   },
 };
 
+// Additional market context multipliers
+const LA_NINA_MULTIPLIER = 1.4;
+const HURRICANE_FALSE_ALARM_WIN_RATE = 0.71;
+const MAX_WIN_PROBABILITY = 0.95;
+
 export interface MarketSignalResultWithInsight extends MarketSignalResult {
   insight: SignalInsight;
+  isHurricaneFalseAlarm: boolean;
+  isLaNinaActive: boolean;
 }
 
 /**
- * Calculates market signal based on temperature, frost duration, and inventory levels.
+ * Calculates market signal based on temperature, frost duration, inventory levels,
+ * and market context (La Niña, Hurricane conditions).
  * Browser-compatible version with embedded rules.
  *
  * @param currentTemp - Current temperature in Fahrenheit
  * @param hoursBelow28 - Number of hours temperature has been below 28°F
  * @param currentInventory - Current inventory in millions (e.g., 30 for 30M)
+ * @param marketContext - Optional market context parameters (La Niña, Hurricane)
  * @returns MarketSignalResultWithInsight with win probability, recommended action, and insight
  */
 export function calculateMarketSignalBrowser(
   currentTemp: number,
   hoursBelow28: number,
-  currentInventory: number
+  currentInventory: number,
+  marketContext?: MarketContextParams
 ): MarketSignalResultWithInsight {
   const { frost_rule, inventory_multipliers, win_rates } = MARKET_RULES;
+
+  // Default market context
+  const context: MarketContextParams = marketContext ?? {
+    isLaNina: false,
+    isHurricaneActive: false,
+    hurricaneCenterFarFromPolk: false,
+  };
+
+  // Check for Hurricane False Alarm first - this overrides all other logic
+  if (context.isHurricaneActive && context.hurricaneCenterFarFromPolk) {
+    return {
+      winProbability: HURRICANE_FALSE_ALARM_WIN_RATE,
+      recommendedAction: "SELL/SHORT (False Alarm)",
+      isHurricaneFalseAlarm: true,
+      isLaNinaActive: context.isLaNina,
+      insight: {
+        frostCondition: "Hurricane override active - frost conditions bypassed",
+        inventoryCondition: "Hurricane override active - inventory conditions bypassed",
+        multiplierApplied: 1.0,
+        baseWinRate: HURRICANE_FALSE_ALARM_WIN_RATE,
+        hurricaneEffect: `Hurricane center >100mi from Polk County = False Alarm. Historical win rate: ${HURRICANE_FALSE_ALARM_WIN_RATE * 100}%`,
+      },
+    };
+  }
 
   // Determine base win probability based on frost conditions
   let baseWinProbability: number;
@@ -118,11 +160,18 @@ export function calculateMarketSignalBrowser(
     inventoryCondition = `Inventory 45-55M: neutral position (1.0x multiplier)`;
   }
 
-  // Calculate final win probability (capped at 0.95)
-  const winProbability = Math.min(
-    baseWinProbability * inventoryMultiplier,
-    0.95
-  );
+  // Calculate win probability with inventory multiplier
+  let winProbability = baseWinProbability * inventoryMultiplier;
+
+  // Apply La Niña effect
+  let laNinaEffect: string | undefined;
+  if (context.isLaNina) {
+    winProbability *= LA_NINA_MULTIPLIER;
+    laNinaEffect = `La Niña active (ONI < -0.5): ${LA_NINA_MULTIPLIER}x multiplier applied. Historical "Double Hit" win rate: ${win_rates.la_nina_double_hit * 100}%`;
+  }
+
+  // Cap at maximum probability
+  winProbability = Math.min(winProbability, MAX_WIN_PROBABILITY);
 
   // Determine recommended action based on inventory and conditions
   let recommendedAction: string;
@@ -139,14 +188,24 @@ export function calculateMarketSignalBrowser(
     recommendedAction = "Monitor";
   }
 
+  // Hurricane warning without false alarm condition
+  let hurricaneEffect: string | undefined;
+  if (context.isHurricaneActive && !context.hurricaneCenterFarFromPolk) {
+    hurricaneEffect = "Hurricane warning active - monitoring for potential impact on Polk County";
+  }
+
   return {
     winProbability: Math.round(winProbability * 100) / 100,
     recommendedAction,
+    isHurricaneFalseAlarm: false,
+    isLaNinaActive: context.isLaNina,
     insight: {
       frostCondition,
       inventoryCondition,
       multiplierApplied: inventoryMultiplier,
       baseWinRate: baseWinProbability,
+      laNinaEffect,
+      hurricaneEffect,
     },
   };
 }
