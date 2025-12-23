@@ -157,6 +157,112 @@ interface SliderControlProps {
   showSign?: boolean;
 }
 
+interface RSISliderProps {
+  value: number;
+  onChange: (value: number) => void;
+}
+
+const RSISlider: React.FC<RSISliderProps> = ({ value, onChange }) => {
+  const isOverbought = value > 70;
+  const isOversold = value < 30;
+
+  // Determine the color based on RSI value
+  const getValueColor = () => {
+    if (isOverbought) return "#ef4444"; // Red
+    if (isOversold) return "#22c55e"; // Green
+    return "#ff8c00"; // Orange (default)
+  };
+
+  const getStatusText = () => {
+    if (isOverbought) return "OVERBOUGHT";
+    if (isOversold) return "OVERSOLD";
+    return "NEUTRAL";
+  };
+
+  return (
+    <div className="mb-8">
+      <div className="flex justify-between items-center mb-2">
+        <label className="text-slate-300 text-sm font-medium uppercase tracking-wider">
+          Market RSI (14-day)
+        </label>
+        <div className="flex items-center gap-2">
+          <span
+            className="text-xs font-semibold px-2 py-0.5 rounded"
+            style={{
+              backgroundColor: `${getValueColor()}20`,
+              color: getValueColor(),
+            }}
+          >
+            {getStatusText()}
+          </span>
+          <span
+            className="text-xl font-bold"
+            style={{ color: getValueColor() }}
+          >
+            {value}
+          </span>
+        </div>
+      </div>
+      <div className="relative">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+          style={{
+            background: isOverbought
+              ? "linear-gradient(to right, #334155 0%, #334155 30%, #eab308 30%, #eab308 70%, #ef4444 70%, #ef4444 100%)"
+              : "linear-gradient(to right, #22c55e 0%, #22c55e 30%, #eab308 30%, #eab308 70%, #334155 70%, #334155 100%)",
+          }}
+        />
+        {/* Custom thumb styling via CSS */}
+        <style>{`
+          input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: ${getValueColor()};
+            cursor: pointer;
+            box-shadow: 0 0 10px ${getValueColor()}80;
+          }
+          input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: ${getValueColor()};
+            border: 0;
+            cursor: pointer;
+            box-shadow: 0 0 10px ${getValueColor()}80;
+          }
+        `}</style>
+      </div>
+      {/* Labels for Oversold and Overbought zones */}
+      <div className="flex justify-between items-center text-xs mt-2">
+        <span className="text-slate-500">0</span>
+        <div className="flex-1 flex justify-between px-4">
+          <span
+            className="text-green-400 font-medium"
+            style={{ marginLeft: "20%" }}
+          >
+            ← Oversold (30)
+          </span>
+          <span
+            className="text-red-400 font-medium"
+            style={{ marginRight: "20%" }}
+          >
+            Overbought (70) →
+          </span>
+        </div>
+        <span className="text-slate-500">100</span>
+      </div>
+    </div>
+  );
+};
+
 const SliderControl: React.FC<SliderControlProps> = ({
   label,
   value,
@@ -1266,6 +1372,9 @@ export const PredictorDashboard: React.FC = () => {
   const [showBlueprintModal, setShowBlueprintModal] = useState<boolean>(false);
   const [blueprintData, setBlueprintData] = useState<TradeBlueprintData | null>(null);
 
+  // RSI state
+  const [rsiValue, setRsiValue] = useState<number>(50);
+
   // Background timer for frost tracking
   useEffect(() => {
     const isBelowCritical = currentTemp <= CRITICAL_TEMP_THRESHOLD;
@@ -1664,6 +1773,9 @@ export const PredictorDashboard: React.FC = () => {
               unit="M"
               onChange={setCurrentInventory}
             />
+
+            {/* RSI Indicator */}
+            <RSISlider value={rsiValue} onChange={setRsiValue} />
 
             {/* Brazil Rainfall Index */}
             <div className="mt-6 pt-6 border-t border-slate-700">
