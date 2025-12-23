@@ -9,6 +9,10 @@ export {
 export { PredictorDashboard } from "./components/PredictorDashboard";
 export {
   fetchLiveMarketData,
+  fetchWeatherData,
   formatSyncTime,
+  getFrostRiskLevel,
   LiveMarketData,
+  WeatherData,
+  LiveWeatherResponse,
 } from "./services/marketDataStream";

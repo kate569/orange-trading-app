@@ -8,7 +8,9 @@ import {
 import {
   fetchLiveMarketData,
   formatSyncTime,
-  LiveMarketData,
+  WeatherData,
+  LiveWeatherResponse,
+  getFrostRiskLevel,
 } from "../services/marketDataStream";
 
 interface SliderControlProps {
@@ -225,6 +227,143 @@ const Toast: React.FC<ToastProps> = ({
           </svg>
         </button>
       </div>
+    </div>
+  );
+};
+
+interface LiveWeatherBadgeProps {
+  weather: WeatherData | null;
+  isLoading: boolean;
+}
+
+const LiveWeatherBadge: React.FC<LiveWeatherBadgeProps> = ({
+  weather,
+  isLoading,
+}) => {
+  if (!weather && !isLoading) return null;
+
+  const frostRisk = weather
+    ? getFrostRiskLevel(weather.temperature, weather.humidity, weather.windSpeed)
+    : null;
+
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case "critical":
+        return "#ef4444";
+      case "high":
+        return "#f97316";
+      case "moderate":
+        return "#eab308";
+      case "low":
+        return "#22c55e";
+      default:
+        return "#64748b";
+    }
+  };
+
+  return (
+    <div
+      className="bg-slate-800/80 rounded-lg p-4 border mb-6 transition-all duration-300"
+      style={{
+        borderColor: weather?.isFreezingConditions ? "#ef4444" : "#334155",
+        boxShadow: weather?.isFreezingConditions
+          ? "0 0 20px rgba(239, 68, 68, 0.2)"
+          : "none",
+      }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div
+            className={`w-2 h-2 rounded-full ${
+              isLoading ? "bg-yellow-400 animate-pulse" : "bg-green-400"
+            }`}
+          />
+          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+            Live Weather Status
+          </span>
+        </div>
+        <span className="text-slate-500 text-xs">
+          📍 Winter Haven, FL
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-4">
+          <svg className="w-6 h-6 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      ) : weather ? (
+        <div className="space-y-3">
+          {/* Condition */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 text-sm">Conditions</span>
+            <span
+              className={`font-semibold text-sm ${
+                weather.isFreezingConditions
+                  ? "text-red-400"
+                  : weather.isFreezeWarning
+                  ? "text-orange-400"
+                  : "text-slate-200"
+              }`}
+            >
+              {weather.condition}
+            </span>
+          </div>
+
+          {/* Temperature */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400 text-sm">Air Temperature</span>
+            <span
+              className={`font-bold text-lg ${
+                weather.temperature <= 28
+                  ? "text-red-400"
+                  : weather.temperature <= 32
+                  ? "text-orange-400"
+                  : weather.temperature <= 36
+                  ? "text-yellow-400"
+                  : "text-green-400"
+              }`}
+            >
+              {weather.temperature}°F
+            </span>
+          </div>
+
+          {/* Humidity & Wind */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-sm">Humidity</span>
+              <span className="text-slate-200 font-medium">{weather.humidity}%</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 text-sm">Wind</span>
+              <span className="text-slate-200 font-medium">{weather.windSpeed} mph</span>
+            </div>
+          </div>
+
+          {/* Frost Risk Indicator */}
+          {frostRisk && (
+            <div
+              className="mt-2 pt-2 border-t border-slate-700 flex items-center justify-between"
+            >
+              <span className="text-slate-400 text-sm">Frost Risk</span>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: getRiskColor(frostRisk.level) }}
+                />
+                <span
+                  className="text-sm font-medium capitalize"
+                  style={{ color: getRiskColor(frostRisk.level) }}
+                >
+                  {frostRisk.level === "none" ? "None" : frostRisk.description}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -697,26 +836,31 @@ export const PredictorDashboard: React.FC = () => {
   const [lastSyncTime, setLastSyncTime] = useState<string | undefined>();
   const [showToast, setShowToast] = useState<boolean>(false);
 
+  // Weather data state
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+
   // Handle live data sync
   const handleSyncLiveData = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const liveData: LiveMarketData = await fetchLiveMarketData();
+      const response: LiveWeatherResponse = await fetchLiveMarketData();
 
-      // Update all sliders with live data
-      setCurrentTemp(liveData.currentTemp);
-      setCurrentInventory(liveData.inventory);
+      // Update weather data
+      setWeatherData(response.weather);
+
+      // Update sliders with live data
+      setCurrentTemp(response.marketData.currentTemp);
+      setCurrentInventory(response.marketData.inventory);
       setMarketContext((prev) => ({
         ...prev,
-        isHurricaneActive: liveData.isHurricaneAlert,
-        // Reset the far-from-polk checkbox when hurricane status changes
-        hurricaneCenterFarFromPolk: liveData.isHurricaneAlert
+        isHurricaneActive: response.marketData.isHurricaneAlert,
+        hurricaneCenterFarFromPolk: response.marketData.isHurricaneAlert
           ? prev.hurricaneCenterFarFromPolk
           : false,
       }));
 
       // Update last sync time and show toast
-      setLastSyncTime(formatSyncTime(liveData.timestamp));
+      setLastSyncTime(formatSyncTime(response.marketData.timestamp));
       setShowToast(true);
     } catch (error) {
       console.error("Failed to sync live data:", error);
@@ -734,6 +878,9 @@ export const PredictorDashboard: React.FC = () => {
       marketContext
     );
   }, [currentTemp, hoursBelow28, currentInventory, marketContext]);
+
+  // Check if we're in freezing conditions (for pulsing header)
+  const isFreezingAlert = weatherData?.isFreezingConditions || currentTemp <= 32;
 
   // Dynamic border styling for La Niña effect
   const getDashboardBorderStyle = () => {
@@ -766,7 +913,7 @@ export const PredictorDashboard: React.FC = () => {
         onClose={() => setShowToast(false)}
       />
 
-      {/* CSS for toast animation */}
+      {/* CSS for animations */}
       <style>{`
         @keyframes slide-up {
           from {
@@ -781,18 +928,53 @@ export const PredictorDashboard: React.FC = () => {
         .animate-slide-up {
           animation: slide-up 0.3s ease-out;
         }
+        @keyframes pulse-red {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+          }
+          50% {
+            box-shadow: 0 0 30px 10px rgba(239, 68, 68, 0.4);
+          }
+        }
+        .animate-pulse-red {
+          animation: pulse-red 2s ease-in-out infinite;
+        }
+        @keyframes text-pulse-red {
+          0%, 100% {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+          }
+          50% {
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.5);
+          }
+        }
+        .animate-text-pulse-red {
+          animation: text-pulse-red 2s ease-in-out infinite;
+        }
       `}</style>
 
       <div
-        className="max-w-4xl mx-auto rounded-2xl p-6 transition-all duration-500"
+        className={`max-w-4xl mx-auto rounded-2xl p-6 transition-all duration-500 ${
+          isFreezingAlert ? "animate-pulse-red" : ""
+        }`}
         style={getDashboardBorderStyle()}
       >
         {/* Header */}
         <div className="mb-10">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-3xl font-bold text-white">
+            <h1
+              className={`text-3xl font-bold transition-colors duration-300 ${
+                isFreezingAlert
+                  ? "text-red-400 animate-text-pulse-red"
+                  : "text-white"
+              }`}
+            >
               Market Signal Predictor
             </h1>
+            {isFreezingAlert && (
+              <span className="px-2 py-1 text-xs font-semibold bg-red-500/20 text-red-400 rounded-full border border-red-500/30 animate-pulse">
+                🥶 FREEZE ALERT
+              </span>
+            )}
             {signal.isLaNinaActive && (
               <span className="px-2 py-1 text-xs font-semibold bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
                 🌊 La Niña Active
@@ -821,6 +1003,12 @@ export const PredictorDashboard: React.FC = () => {
               onClick={handleSyncLiveData}
               isLoading={isSyncing}
               lastSync={lastSyncTime}
+            />
+
+            {/* Live Weather Status Badge */}
+            <LiveWeatherBadge
+              weather={weatherData}
+              isLoading={isSyncing}
             />
 
             {/* Market Context Section */}
