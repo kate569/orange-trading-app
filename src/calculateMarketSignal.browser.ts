@@ -17,6 +17,8 @@ interface WinRates {
   la_nina_double_hit: number;
   volatility_pre_frost: number;
   real_frost: number;
+  hurricane_false_alarm: number;
+  brazil_drought: number;
 }
 
 interface MarketRules {
@@ -38,12 +40,15 @@ export interface SignalInsight {
   baseWinRate: number;
   laNinaEffect?: string;
   hurricaneEffect?: string;
+  brazilDroughtEffect?: string;
 }
 
 export interface MarketContextParams {
   isLaNina: boolean;
   isHurricaneActive: boolean;
   hurricaneCenterFarFromPolk: boolean;
+  brazilRainfallIndex: number;
+  currentMonth: number; // 1-12
 }
 
 // Embedded market rules (from constants/market_rules.json)
@@ -63,29 +68,35 @@ const MARKET_RULES: MarketRules = {
     la_nina_double_hit: 0.79,
     volatility_pre_frost: 0.79,
     real_frost: 0.76,
+    hurricane_false_alarm: 0.71,
+    brazil_drought: 0.69,
   },
 };
 
 // Additional market context multipliers
 const LA_NINA_MULTIPLIER = 1.4;
 const HURRICANE_FALSE_ALARM_WIN_RATE = 0.71;
+const BRAZIL_DROUGHT_WIN_RATE = 0.69;
+const BRAZIL_DROUGHT_THRESHOLD = -1.5;
+const BRAZIL_DROUGHT_MONTHS = [8, 9, 10]; // Aug, Sep, Oct
 const MAX_WIN_PROBABILITY = 0.95;
 
 export interface MarketSignalResultWithInsight extends MarketSignalResult {
   insight: SignalInsight;
   isHurricaneFalseAlarm: boolean;
   isLaNinaActive: boolean;
+  isBrazilDrought: boolean;
 }
 
 /**
  * Calculates market signal based on temperature, frost duration, inventory levels,
- * and market context (La Niña, Hurricane conditions).
+ * and market context (La Niña, Hurricane, Brazil Drought conditions).
  * Browser-compatible version with embedded rules.
  *
  * @param currentTemp - Current temperature in Fahrenheit
  * @param hoursBelow28 - Number of hours temperature has been below 28°F
  * @param currentInventory - Current inventory in millions (e.g., 30 for 30M)
- * @param marketContext - Optional market context parameters (La Niña, Hurricane)
+ * @param marketContext - Optional market context parameters (La Niña, Hurricane, Brazil)
  * @returns MarketSignalResultWithInsight with win probability, recommended action, and insight
  */
 export function calculateMarketSignalBrowser(
@@ -101,15 +112,43 @@ export function calculateMarketSignalBrowser(
     isLaNina: false,
     isHurricaneActive: false,
     hurricaneCenterFarFromPolk: false,
+    brazilRainfallIndex: 0,
+    currentMonth: new Date().getMonth() + 1,
   };
 
-  // Check for Hurricane False Alarm first - this overrides all other logic
+  // Check for Brazil Drought first (Aug-Oct, SPI-3 < -1.5)
+  const isBrazilDroughtSeason = BRAZIL_DROUGHT_MONTHS.includes(
+    context.currentMonth
+  );
+  const isBrazilDrought =
+    isBrazilDroughtSeason &&
+    context.brazilRainfallIndex < BRAZIL_DROUGHT_THRESHOLD;
+
+  if (isBrazilDrought) {
+    return {
+      winProbability: BRAZIL_DROUGHT_WIN_RATE,
+      recommendedAction: "STRONG LONG (Brazil Drought)",
+      isHurricaneFalseAlarm: false,
+      isLaNinaActive: context.isLaNina,
+      isBrazilDrought: true,
+      insight: {
+        frostCondition: "Brazil drought override active - frost conditions bypassed",
+        inventoryCondition: "Brazil drought override active - inventory conditions bypassed",
+        multiplierApplied: 1.0,
+        baseWinRate: BRAZIL_DROUGHT_WIN_RATE,
+        brazilDroughtEffect: `Brazil SPI-3 at ${context.brazilRainfallIndex.toFixed(1)} (< ${BRAZIL_DROUGHT_THRESHOLD}) during peak season. Historical win rate: ${BRAZIL_DROUGHT_WIN_RATE * 100}%`,
+      },
+    };
+  }
+
+  // Check for Hurricane False Alarm - this overrides frost/inventory logic
   if (context.isHurricaneActive && context.hurricaneCenterFarFromPolk) {
     return {
       winProbability: HURRICANE_FALSE_ALARM_WIN_RATE,
       recommendedAction: "SELL/SHORT (False Alarm)",
       isHurricaneFalseAlarm: true,
       isLaNinaActive: context.isLaNina,
+      isBrazilDrought: false,
       insight: {
         frostCondition: "Hurricane override active - frost conditions bypassed",
         inventoryCondition: "Hurricane override active - inventory conditions bypassed",
@@ -194,11 +233,20 @@ export function calculateMarketSignalBrowser(
     hurricaneEffect = "Hurricane warning active - monitoring for potential impact on Polk County";
   }
 
+  // Brazil drought info (outside of season or above threshold)
+  let brazilDroughtEffect: string | undefined;
+  if (isBrazilDroughtSeason && context.brazilRainfallIndex >= BRAZIL_DROUGHT_THRESHOLD) {
+    brazilDroughtEffect = `Brazil SPI-3 at ${context.brazilRainfallIndex.toFixed(1)} (above ${BRAZIL_DROUGHT_THRESHOLD} threshold) - no drought signal`;
+  } else if (!isBrazilDroughtSeason && context.brazilRainfallIndex < BRAZIL_DROUGHT_THRESHOLD) {
+    brazilDroughtEffect = `Brazil SPI-3 at ${context.brazilRainfallIndex.toFixed(1)} - drought conditions noted but outside Aug-Oct window`;
+  }
+
   return {
     winProbability: Math.round(winProbability * 100) / 100,
     recommendedAction,
     isHurricaneFalseAlarm: false,
     isLaNinaActive: context.isLaNina,
+    isBrazilDrought: false,
     insight: {
       frostCondition,
       inventoryCondition,
@@ -206,6 +254,16 @@ export function calculateMarketSignalBrowser(
       baseWinRate: baseWinProbability,
       laNinaEffect,
       hurricaneEffect,
+      brazilDroughtEffect,
     },
   };
 }
+
+// Export win rates for the Strategy Summary Table
+export const STRATEGY_WIN_RATES = {
+  laNina: MARKET_RULES.win_rates.la_nina_double_hit,
+  volatility: MARKET_RULES.win_rates.volatility_pre_frost,
+  realFrost: MARKET_RULES.win_rates.real_frost,
+  hurricaneFalseAlarm: MARKET_RULES.win_rates.hurricane_false_alarm,
+  brazilDrought: MARKET_RULES.win_rates.brazil_drought,
+};

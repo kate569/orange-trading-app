@@ -3,6 +3,7 @@ import {
   calculateMarketSignalBrowser,
   MarketSignalResultWithInsight,
   MarketContextParams,
+  STRATEGY_WIN_RATES,
 } from "../calculateMarketSignal.browser";
 
 interface SliderControlProps {
@@ -13,6 +14,7 @@ interface SliderControlProps {
   step?: number;
   unit: string;
   onChange: (value: number) => void;
+  showSign?: boolean;
 }
 
 const SliderControl: React.FC<SliderControlProps> = ({
@@ -23,7 +25,10 @@ const SliderControl: React.FC<SliderControlProps> = ({
   step = 1,
   unit,
   onChange,
+  showSign = false,
 }) => {
+  const displayValue = showSign && value > 0 ? `+${value}` : `${value}`;
+
   return (
     <div className="mb-8">
       <div className="flex justify-between items-center mb-2">
@@ -31,7 +36,7 @@ const SliderControl: React.FC<SliderControlProps> = ({
           {label}
         </label>
         <span className="text-xl font-bold" style={{ color: "#ff8c00" }}>
-          {value}
+          {displayValue}
           {unit}
         </span>
       </div>
@@ -60,10 +65,12 @@ const SliderControl: React.FC<SliderControlProps> = ({
       />
       <div className="flex justify-between text-xs text-slate-500 mt-1">
         <span>
+          {showSign && min > 0 ? "+" : ""}
           {min}
           {unit}
         </span>
         <span>
+          {showSign && max > 0 ? "+" : ""}
           {max}
           {unit}
         </span>
@@ -204,13 +211,22 @@ const MarketContextSection: React.FC<MarketContextSectionProps> = ({
 interface SignalGaugeProps {
   action: string;
   isHurricaneFalseAlarm: boolean;
+  isBrazilDrought: boolean;
 }
 
 const SignalGauge: React.FC<SignalGaugeProps> = ({
   action,
   isHurricaneFalseAlarm,
+  isBrazilDrought,
 }) => {
-  const accentColor = isHurricaneFalseAlarm ? "#ef4444" : "#ff8c00";
+  // Determine accent color based on signal type
+  const getAccentColor = () => {
+    if (isHurricaneFalseAlarm) return "#ef4444"; // Red for short
+    if (isBrazilDrought) return "#a855f7"; // Purple for Brazil drought
+    return "#ff8c00"; // Orange default
+  };
+
+  const accentColor = getAccentColor();
 
   return (
     <div
@@ -238,6 +254,39 @@ const SignalGauge: React.FC<SignalGaugeProps> = ({
           ⚠️ Short Opportunity Detected
         </div>
       )}
+      {isBrazilDrought && (
+        <div className="mt-2 text-purple-400 text-xs uppercase tracking-wider">
+          🌾 Brazil Supply Crisis
+        </div>
+      )}
+    </div>
+  );
+};
+
+const BrazilDroughtWarning: React.FC = () => {
+  return (
+    <div
+      className="p-4 rounded-lg border-2 mt-4"
+      style={{
+        backgroundColor: "rgba(168, 85, 247, 0.1)",
+        borderColor: "#a855f7",
+        boxShadow: "0 0 20px rgba(168, 85, 247, 0.2)",
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <span className="text-2xl">⚠️</span>
+        <div>
+          <div
+            className="font-black text-lg uppercase tracking-wide mb-1"
+            style={{ color: "#a855f7" }}
+          >
+            CRITICAL
+          </div>
+          <p className="text-purple-200 font-semibold">
+            Do not exit for 12-18 months. 40-60% of move happens after 90 days.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
@@ -353,6 +402,12 @@ const LogicInsight: React.FC<LogicInsightProps> = ({ insight }) => {
             <span className="text-red-300">{insight.hurricaneEffect}</span>
           </div>
         )}
+        {insight.brazilDroughtEffect && (
+          <div className="flex items-start gap-2">
+            <span className="text-purple-400">🌾</span>
+            <span className="text-purple-300">{insight.brazilDroughtEffect}</span>
+          </div>
+        )}
         <div className="mt-3 pt-3 border-t border-slate-700 text-slate-400">
           <span className="text-xs">
             Base win rate: {Math.round(insight.baseWinRate * 100)}% ×{" "}
@@ -360,6 +415,110 @@ const LogicInsight: React.FC<LogicInsightProps> = ({ insight }) => {
             {insight.laNinaEffect && " × 1.4x La Niña"}
           </span>
         </div>
+      </div>
+    </div>
+  );
+};
+
+const StrategySummaryTable: React.FC = () => {
+  const strategies = [
+    {
+      name: "La Niña Double Hit",
+      winRate: STRATEGY_WIN_RATES.laNina,
+      icon: "🌊",
+      color: "#3b82f6",
+    },
+    {
+      name: "Pre-Frost Volatility",
+      winRate: STRATEGY_WIN_RATES.volatility,
+      icon: "📈",
+      color: "#ff8c00",
+    },
+    {
+      name: "Real Frost Event",
+      winRate: STRATEGY_WIN_RATES.realFrost,
+      icon: "❄️",
+      color: "#60a5fa",
+    },
+    {
+      name: "Hurricane False Alarm",
+      winRate: STRATEGY_WIN_RATES.hurricaneFalseAlarm,
+      icon: "🌀",
+      color: "#ef4444",
+    },
+    {
+      name: "Brazil Drought",
+      winRate: STRATEGY_WIN_RATES.brazilDrought,
+      icon: "🌾",
+      color: "#a855f7",
+    },
+  ];
+
+  // Sort by win rate descending
+  const sortedStrategies = [...strategies].sort(
+    (a, b) => b.winRate - a.winRate
+  );
+
+  return (
+    <div className="bg-slate-900 rounded-xl p-6 border border-slate-800 shadow-2xl mt-6">
+      <h2 className="text-lg font-semibold text-slate-200 mb-6 pb-4 border-b border-slate-700">
+        Strategy Summary Table
+      </h2>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-700">
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider py-3 px-4">
+                Strategy
+              </th>
+              <th className="text-right text-xs font-semibold text-slate-400 uppercase tracking-wider py-3 px-4">
+                Historical Win Rate
+              </th>
+              <th className="text-left text-xs font-semibold text-slate-400 uppercase tracking-wider py-3 px-4 w-1/3">
+                Performance
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedStrategies.map((strategy, index) => (
+              <tr
+                key={strategy.name}
+                className={`border-b border-slate-800 ${
+                  index % 2 === 0 ? "bg-slate-800/30" : ""
+                }`}
+              >
+                <td className="py-4 px-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{strategy.icon}</span>
+                    <span className="text-slate-200 font-medium">
+                      {strategy.name}
+                    </span>
+                  </div>
+                </td>
+                <td className="py-4 px-4 text-right">
+                  <span
+                    className="text-xl font-bold"
+                    style={{ color: strategy.color }}
+                  >
+                    {Math.round(strategy.winRate * 100)}%
+                  </span>
+                </td>
+                <td className="py-4 px-4">
+                  <div className="w-full bg-slate-700 rounded-full h-3">
+                    <div
+                      className="h-3 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${strategy.winRate * 100}%`,
+                        backgroundColor: strategy.color,
+                        boxShadow: `0 0 10px ${strategy.color}80`,
+                      }}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -373,6 +532,8 @@ export const PredictorDashboard: React.FC = () => {
     isLaNina: false,
     isHurricaneActive: false,
     hurricaneCenterFarFromPolk: false,
+    brazilRainfallIndex: 0,
+    currentMonth: new Date().getMonth() + 1,
   });
 
   // Calculate signal instantly as sliders move
@@ -399,6 +560,13 @@ export const PredictorDashboard: React.FC = () => {
     };
   };
 
+  // Check if we're in Brazil drought season (Aug-Oct)
+  const isBrazilDroughtSeason = [8, 9, 10].includes(marketContext.currentMonth);
+  const monthNames = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
+
   return (
     <div className="min-h-screen bg-slate-950 p-8">
       <div
@@ -407,13 +575,18 @@ export const PredictorDashboard: React.FC = () => {
       >
         {/* Header */}
         <div className="mb-10">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-3xl font-bold text-white">
               Market Signal Predictor
             </h1>
             {signal.isLaNinaActive && (
               <span className="px-2 py-1 text-xs font-semibold bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">
                 🌊 La Niña Active
+              </span>
+            )}
+            {signal.isBrazilDrought && (
+              <span className="px-2 py-1 text-xs font-semibold bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">
+                🌾 Brazil Drought
               </span>
             )}
           </div>
@@ -461,6 +634,44 @@ export const PredictorDashboard: React.FC = () => {
               unit="M"
               onChange={setCurrentInventory}
             />
+
+            {/* Brazil Rainfall Index */}
+            <div className="mt-6 pt-6 border-t border-slate-700">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                  Brazil Supply Monitor
+                </h3>
+                <span
+                  className={`text-xs px-2 py-1 rounded-full ${
+                    isBrazilDroughtSeason
+                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                      : "bg-slate-700 text-slate-400"
+                  }`}
+                >
+                  {monthNames[marketContext.currentMonth - 1]} (
+                  {isBrazilDroughtSeason ? "Peak Season" : "Off Season"})
+                </span>
+              </div>
+              <SliderControl
+                label="Brazil Rainfall Index (SPI-3)"
+                value={marketContext.brazilRainfallIndex}
+                min={-3}
+                max={3}
+                step={0.1}
+                unit=""
+                onChange={(value) =>
+                  setMarketContext({
+                    ...marketContext,
+                    brazilRainfallIndex: Math.round(value * 10) / 10,
+                  })
+                }
+                showSign
+              />
+              <div className="flex justify-between text-xs text-slate-500 -mt-6">
+                <span className="text-red-400">Extreme Drought</span>
+                <span className="text-green-400">Excess Rain</span>
+              </div>
+            </div>
           </div>
 
           {/* Prediction Results */}
@@ -474,7 +685,11 @@ export const PredictorDashboard: React.FC = () => {
               <SignalGauge
                 action={signal.recommendedAction}
                 isHurricaneFalseAlarm={signal.isHurricaneFalseAlarm}
+                isBrazilDrought={signal.isBrazilDrought}
               />
+
+              {/* Brazil Drought Warning */}
+              {signal.isBrazilDrought && <BrazilDroughtWarning />}
 
               {/* Win Probability Meter */}
               <WinProbabilityMeter probability={signal.winProbability} />
@@ -484,6 +699,9 @@ export const PredictorDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Strategy Summary Table */}
+        <StrategySummaryTable />
       </div>
     </div>
   );
