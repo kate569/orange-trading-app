@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   calculateMarketSignalBrowser,
   MarketSignalResultWithInsight,
@@ -12,6 +12,65 @@ import {
   LiveWeatherResponse,
   getFrostRiskLevel,
 } from "../services/marketDataStream";
+
+// localStorage keys for frost tracker persistence
+const FROST_STORAGE_KEY = "oj_frost_tracker";
+const CRITICAL_FROST_HOURS = 4;
+const CRITICAL_TEMP_THRESHOLD = 28;
+const RESET_TEMP_THRESHOLD = 32;
+
+interface FrostTrackerData {
+  accumulatedSeconds: number;
+  lastUpdateTime: number;
+  isTracking: boolean;
+}
+
+// Helper to load frost data from localStorage
+function loadFrostData(): FrostTrackerData {
+  try {
+    const stored = localStorage.getItem(FROST_STORAGE_KEY);
+    if (stored) {
+      const data = JSON.parse(stored) as FrostTrackerData;
+      // If we were tracking, add the time since last update
+      if (data.isTracking && data.lastUpdateTime) {
+        const now = Date.now();
+        const elapsedSeconds = Math.floor((now - data.lastUpdateTime) / 1000);
+        return {
+          ...data,
+          accumulatedSeconds: data.accumulatedSeconds + elapsedSeconds,
+          lastUpdateTime: now,
+        };
+      }
+      return data;
+    }
+  } catch (e) {
+    console.error("Failed to load frost data:", e);
+  }
+  return { accumulatedSeconds: 0, lastUpdateTime: Date.now(), isTracking: false };
+}
+
+// Helper to save frost data to localStorage
+function saveFrostData(data: FrostTrackerData): void {
+  try {
+    localStorage.setItem(FROST_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error("Failed to save frost data:", e);
+  }
+}
+
+// Helper to format seconds as "Xh Ym Zs"
+function formatFrostDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
 
 interface SliderControlProps {
   label: string;
@@ -226,6 +285,165 @@ const Toast: React.FC<ToastProps> = ({
             />
           </svg>
         </button>
+      </div>
+    </div>
+  );
+};
+
+interface FrostClockProps {
+  accumulatedSeconds: number;
+  isTracking: boolean;
+  onReset: () => void;
+}
+
+const FrostClock: React.FC<FrostClockProps> = ({
+  accumulatedSeconds,
+  isTracking,
+  onReset,
+}) => {
+  const hours = accumulatedSeconds / 3600;
+  const progress = Math.min((hours / CRITICAL_FROST_HOURS) * 100, 100);
+  const isCritical = hours >= CRITICAL_FROST_HOURS;
+
+  return (
+    <div
+      className={`rounded-lg p-4 border transition-all duration-300 ${
+        isCritical
+          ? "bg-red-900/30 border-red-500"
+          : isTracking
+          ? "bg-blue-900/30 border-blue-500"
+          : "bg-slate-800/50 border-slate-700"
+      }`}
+      style={{
+        boxShadow: isCritical
+          ? "0 0 20px rgba(239, 68, 68, 0.3)"
+          : isTracking
+          ? "0 0 15px rgba(59, 130, 246, 0.2)"
+          : "none",
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">⏱️</span>
+          <span
+            className={`text-xs font-semibold uppercase tracking-wider ${
+              isCritical
+                ? "text-red-400"
+                : isTracking
+                ? "text-blue-400"
+                : "text-slate-400"
+            }`}
+          >
+            Frost Clock
+          </span>
+          {isTracking && (
+            <span className="flex items-center gap-1">
+              <span
+                className={`w-2 h-2 rounded-full animate-pulse ${
+                  isCritical ? "bg-red-500" : "bg-blue-500"
+                }`}
+              />
+              <span className="text-xs text-slate-500">TRACKING</span>
+            </span>
+          )}
+        </div>
+        {accumulatedSeconds > 0 && (
+          <button
+            onClick={onReset}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Reset
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-slate-400 text-sm">Time at Critical Level:</span>
+        <span
+          className={`text-xl font-bold font-mono ${
+            isCritical
+              ? "text-red-400"
+              : isTracking
+              ? "text-blue-400"
+              : "text-slate-300"
+          }`}
+        >
+          {formatFrostDuration(accumulatedSeconds)}
+        </span>
+      </div>
+
+      {/* Progress bar to 4 hours */}
+      <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+        <div
+          className={`h-2 rounded-full transition-all duration-1000 ${
+            isCritical ? "bg-red-500" : "bg-blue-500"
+          }`}
+          style={{
+            width: `${progress}%`,
+            boxShadow: isCritical
+              ? "0 0 10px rgba(239, 68, 68, 0.5)"
+              : "0 0 10px rgba(59, 130, 246, 0.5)",
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-xs text-slate-500 mt-1">
+        <span>0h</span>
+        <span className={isCritical ? "text-red-400 font-semibold" : ""}>
+          {CRITICAL_FROST_HOURS}h (Damage Threshold)
+        </span>
+      </div>
+    </div>
+  );
+};
+
+interface PhysicalDamageAlertProps {
+  isVisible: boolean;
+  onDismiss: () => void;
+}
+
+const PhysicalDamageAlert: React.FC<PhysicalDamageAlertProps> = ({
+  isVisible,
+  onDismiss,
+}) => {
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+      <div
+        className="max-w-md w-full rounded-xl p-6 animate-bounce-in"
+        style={{
+          background: "linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%)",
+          border: "2px solid #ef4444",
+          boxShadow:
+            "0 0 60px rgba(239, 68, 68, 0.5), 0 0 100px rgba(239, 68, 68, 0.3)",
+        }}
+      >
+        <div className="text-center">
+          <div className="text-5xl mb-4 animate-pulse">🚨</div>
+          <h2 className="text-2xl font-black text-red-400 uppercase tracking-wider mb-2">
+            Physical Damage Confirmed
+          </h2>
+          <p className="text-red-200 text-lg font-bold mb-4">
+            4+ Hours Below 28°F
+          </p>
+          <div
+            className="bg-red-500/20 rounded-lg p-4 mb-6 border border-red-500/50"
+          >
+            <p className="text-xl font-black text-white uppercase tracking-wide">
+              EXECUTE TRADE NOW
+            </p>
+            <p className="text-red-200 text-sm mt-2">
+              Citrus crop damage is virtually certain. Historical win rate: 76%
+            </p>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg 
+                       transition-colors uppercase tracking-wider"
+          >
+            Acknowledge
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -839,6 +1057,94 @@ export const PredictorDashboard: React.FC = () => {
   // Weather data state
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
 
+  // Frost duration tracker state
+  const [frostData, setFrostData] = useState<FrostTrackerData>(() => loadFrostData());
+  const [showDamageAlert, setShowDamageAlert] = useState<boolean>(false);
+  const damageAlertShownRef = useRef<boolean>(false);
+
+  // Background timer for frost tracking
+  useEffect(() => {
+    const isBelowCritical = currentTemp <= CRITICAL_TEMP_THRESHOLD;
+    const isAboveReset = currentTemp > RESET_TEMP_THRESHOLD;
+
+    // Start tracking if temp drops to critical level
+    if (isBelowCritical && !frostData.isTracking) {
+      const newData: FrostTrackerData = {
+        ...frostData,
+        isTracking: true,
+        lastUpdateTime: Date.now(),
+      };
+      setFrostData(newData);
+      saveFrostData(newData);
+    }
+
+    // Reset if temperature rises above reset threshold
+    if (isAboveReset && frostData.isTracking) {
+      const newData: FrostTrackerData = {
+        accumulatedSeconds: 0,
+        isTracking: false,
+        lastUpdateTime: Date.now(),
+      };
+      setFrostData(newData);
+      saveFrostData(newData);
+      damageAlertShownRef.current = false;
+    }
+
+    // Timer interval for updating accumulated time
+    let intervalId: NodeJS.Timeout | undefined;
+
+    if (frostData.isTracking && isBelowCritical) {
+      intervalId = setInterval(() => {
+        setFrostData((prev) => {
+          const newData: FrostTrackerData = {
+            ...prev,
+            accumulatedSeconds: prev.accumulatedSeconds + 1,
+            lastUpdateTime: Date.now(),
+          };
+          saveFrostData(newData);
+
+          // Check if we've hit the critical threshold
+          const hours = newData.accumulatedSeconds / 3600;
+          if (hours >= CRITICAL_FROST_HOURS && !damageAlertShownRef.current) {
+            damageAlertShownRef.current = true;
+            setShowDamageAlert(true);
+          }
+
+          return newData;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [currentTemp, frostData.isTracking]);
+
+  // Update hoursBelow28 slider based on frost tracker
+  useEffect(() => {
+    if (frostData.isTracking) {
+      const hours = Math.floor(frostData.accumulatedSeconds / 3600);
+      if (hours !== hoursBelow28 && hours <= 12) {
+        setHoursBelow28(hours);
+      }
+    }
+  }, [frostData.accumulatedSeconds, frostData.isTracking, hoursBelow28]);
+
+  // Reset frost tracker
+  const handleResetFrostTracker = useCallback(() => {
+    const newData: FrostTrackerData = {
+      accumulatedSeconds: 0,
+      isTracking: false,
+      lastUpdateTime: Date.now(),
+    };
+    setFrostData(newData);
+    saveFrostData(newData);
+    damageAlertShownRef.current = false;
+    setHoursBelow28(0);
+  }, []);
+
   // Handle live data sync
   const handleSyncLiveData = useCallback(async () => {
     setIsSyncing(true);
@@ -913,6 +1219,12 @@ export const PredictorDashboard: React.FC = () => {
         onClose={() => setShowToast(false)}
       />
 
+      {/* Physical Damage Alert Modal */}
+      <PhysicalDamageAlert
+        isVisible={showDamageAlert}
+        onDismiss={() => setShowDamageAlert(false)}
+      />
+
       {/* CSS for animations */}
       <style>{`
         @keyframes slide-up {
@@ -949,6 +1261,25 @@ export const PredictorDashboard: React.FC = () => {
         }
         .animate-text-pulse-red {
           animation: text-pulse-red 2s ease-in-out infinite;
+        }
+        @keyframes bounce-in {
+          0% {
+            opacity: 0;
+            transform: scale(0.3);
+          }
+          50% {
+            transform: scale(1.05);
+          }
+          70% {
+            transform: scale(0.9);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-bounce-in {
+          animation: bounce-in 0.5s ease-out;
         }
       `}</style>
 
@@ -1010,6 +1341,15 @@ export const PredictorDashboard: React.FC = () => {
               weather={weatherData}
               isLoading={isSyncing}
             />
+
+            {/* Frost Duration Tracker */}
+            <div className="mb-6">
+              <FrostClock
+                accumulatedSeconds={frostData.accumulatedSeconds}
+                isTracking={frostData.isTracking}
+                onReset={handleResetFrostTracker}
+              />
+            </div>
 
             {/* Market Context Section */}
             <MarketContextSection
