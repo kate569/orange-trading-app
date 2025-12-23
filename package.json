@@ -1,0 +1,21 @@
+{
+  "name": "market-signal-calculator",
+  "version": "1.0.0",
+  "description": "Market signal calculation based on frost and inventory rules",
+  "main": "dist/calculateMarketSignal.js",
+  "types": "dist/calculateMarketSignal.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "keywords": [
+    "market",
+    "trading",
+    "signal"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
