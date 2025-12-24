@@ -214,195 +214,164 @@ function generateTradeBlueprintText(data: TradeBlueprintData): string {
 `.trim();
 }
 
-interface SliderControlProps {
+// Data Card component for read-only value display
+interface DataCardProps {
   label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  unit: string;
-  onChange: (value: number) => void;
-  showSign?: boolean;
-}
-
-interface RSISliderProps {
-  value: number;
-  onChange: (value: number) => void;
+  value: string | number;
+  unit?: string;
+  icon?: string;
+  color?: string;
+  sublabel?: string;
+  status?: {
+    text: string;
+    color: string;
+  };
   isAutoSynced?: boolean;
-  syncError?: string;
 }
 
-const RSISlider: React.FC<RSISliderProps> = ({ value, onChange, isAutoSynced = false, syncError }) => {
-  const isOverbought = value > 70;
-  const isOversold = value < 30;
-
-  // Determine the color based on RSI value
-  const getValueColor = () => {
-    if (isOverbought) return "#ef4444"; // Red
-    if (isOversold) return "#22c55e"; // Green
-    return "#ff8c00"; // Orange (default)
-  };
-
-  const getStatusText = () => {
-    if (isOverbought) return "OVERBOUGHT";
-    if (isOversold) return "OVERSOLD";
-    return "NEUTRAL";
-  };
-
+const DataCard: React.FC<DataCardProps> = ({
+  label,
+  value,
+  unit = "",
+  icon,
+  color = "#ff8c00",
+  sublabel,
+  status,
+  isAutoSynced = false,
+}) => {
   return (
-    <div className="mb-8">
-      <div className="flex justify-between items-center mb-2">
+    <div
+      className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 transition-all duration-300 hover:border-slate-600"
+      style={{
+        boxShadow: `0 0 10px ${color}10`,
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <label className="text-slate-300 text-sm font-medium uppercase tracking-wider">
-            Market RSI (14-day)
-          </label>
+          {icon && <span className="text-lg">{icon}</span>}
+          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+            {label}
+          </span>
           {isAutoSynced && (
-            <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
+            <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              Auto-syncing
-            </span>
-          )}
-          {syncError && !isAutoSynced && (
-            <span className="text-xs text-yellow-500" title={syncError}>
-              ⚠️ Manual
+              Live
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        {status && (
           <span
             className="text-xs font-semibold px-2 py-0.5 rounded"
             style={{
-              backgroundColor: `${getValueColor()}20`,
-              color: getValueColor(),
+              backgroundColor: `${status.color}20`,
+              color: status.color,
             }}
           >
-            {getStatusText()}
+            {status.text}
           </span>
-          <span
-            className="text-xl font-bold"
-            style={{ color: getValueColor() }}
-          >
-            {value}
-          </span>
-        </div>
+        )}
       </div>
-      <div className="relative">
-        <input
-          type="range"
-          min={0}
-          max={100}
-          step={1}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-          style={{
-            background: isOverbought
-              ? "linear-gradient(to right, #334155 0%, #334155 30%, #eab308 30%, #eab308 70%, #ef4444 70%, #ef4444 100%)"
-              : "linear-gradient(to right, #22c55e 0%, #22c55e 30%, #eab308 30%, #eab308 70%, #334155 70%, #334155 100%)",
-          }}
-        />
-        {/* Custom thumb styling via CSS */}
-        <style>{`
-          input[type="range"]::-webkit-slider-thumb {
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: ${getValueColor()};
-            cursor: pointer;
-            box-shadow: 0 0 10px ${getValueColor()}80;
-          }
-          input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: ${getValueColor()};
-            border: 0;
-            cursor: pointer;
-            box-shadow: 0 0 10px ${getValueColor()}80;
-          }
-        `}</style>
+      <div className="flex items-baseline gap-1">
+        <span
+          className="text-2xl font-bold"
+          style={{ color }}
+        >
+          {value}
+        </span>
+        {unit && (
+          <span className="text-slate-400 text-sm font-medium">{unit}</span>
+        )}
       </div>
-      {/* Labels for Oversold and Overbought zones */}
-      <div className="flex justify-between items-center text-xs mt-2">
-        <span className="text-slate-500">0</span>
-        <div className="flex-1 flex justify-between px-4">
-          <span
-            className="text-green-400 font-medium"
-            style={{ marginLeft: "20%" }}
-          >
-            ← Oversold (30)
-          </span>
-          <span
-            className="text-red-400 font-medium"
-            style={{ marginRight: "20%" }}
-          >
-            Overbought (70) →
-          </span>
-        </div>
-        <span className="text-slate-500">100</span>
-      </div>
+      {sublabel && (
+        <p className="text-slate-500 text-xs mt-1">{sublabel}</p>
+      )}
     </div>
   );
 };
 
-const SliderControl: React.FC<SliderControlProps> = ({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  unit,
-  onChange,
-  showSign = false,
-}) => {
-  const displayValue = showSign && value > 0 ? `+${value}` : `${value}`;
+// RSI Data Card with special status indicators
+interface RSIDataCardProps {
+  value: number;
+  isAutoSynced?: boolean;
+  syncError?: string;
+}
+
+const RSIDataCard: React.FC<RSIDataCardProps> = ({ value, isAutoSynced = false, syncError }) => {
+  const isOverbought = value > 70;
+  const isOversold = value < 30;
+
+  const getValueColor = () => {
+    if (isOverbought) return "#ef4444";
+    if (isOversold) return "#22c55e";
+    return "#ff8c00";
+  };
+
+  const getStatus = () => {
+    if (isOverbought) return { text: "OVERBOUGHT", color: "#ef4444" };
+    if (isOversold) return { text: "OVERSOLD", color: "#22c55e" };
+    return { text: "NEUTRAL", color: "#ff8c00" };
+  };
 
   return (
-    <div className="mb-8">
-      <div className="flex justify-between items-center mb-2">
-        <label className="text-slate-300 text-sm font-medium uppercase tracking-wider">
-          {label}
-        </label>
-        <span className="text-xl font-bold" style={{ color: "#ff8c00" }}>
-          {displayValue}
-          {unit}
+    <div
+      className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 transition-all duration-300"
+      style={{
+        borderColor: isOverbought ? "#ef444440" : isOversold ? "#22c55e40" : "#334155",
+        boxShadow: `0 0 15px ${getValueColor()}15`,
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📊</span>
+          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+            Market RSI (14-day)
+          </span>
+          {isAutoSynced && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Live
+            </span>
+          )}
+          {syncError && !isAutoSynced && (
+            <span className="text-xs text-yellow-500" title={syncError}>
+              ⚠️
+            </span>
+          )}
+        </div>
+        <span
+          className="text-xs font-semibold px-2 py-0.5 rounded"
+          style={{
+            backgroundColor: `${getStatus().color}20`,
+            color: getStatus().color,
+          }}
+        >
+          {getStatus().text}
         </span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer
-                   [&::-webkit-slider-thumb]:appearance-none
-                   [&::-webkit-slider-thumb]:w-5
-                   [&::-webkit-slider-thumb]:h-5
-                   [&::-webkit-slider-thumb]:rounded-full
-                   [&::-webkit-slider-thumb]:bg-[#ff8c00]
-                   [&::-webkit-slider-thumb]:cursor-pointer
-                   [&::-webkit-slider-thumb]:shadow-lg
-                   [&::-webkit-slider-thumb]:shadow-orange-500/30
-                   [&::-moz-range-thumb]:w-5
-                   [&::-moz-range-thumb]:h-5
-                   [&::-moz-range-thumb]:rounded-full
-                   [&::-moz-range-thumb]:bg-[#ff8c00]
-                   [&::-moz-range-thumb]:border-0
-                   [&::-moz-range-thumb]:cursor-pointer"
-      />
+      <div className="flex items-baseline gap-2">
+        <span
+          className="text-3xl font-bold"
+          style={{ color: getValueColor() }}
+        >
+          {value}
+        </span>
+        <span className="text-slate-500 text-sm">/ 100</span>
+      </div>
+      {/* RSI Scale indicator */}
+      <div className="mt-3 relative">
+        <div className="h-2 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 opacity-30" />
+        <div
+          className="absolute top-0 w-3 h-3 rounded-full border-2 border-white transform -translate-x-1/2 -translate-y-0.5"
+          style={{
+            left: `${value}%`,
+            backgroundColor: getValueColor(),
+            boxShadow: `0 0 8px ${getValueColor()}`,
+          }}
+        />
+      </div>
       <div className="flex justify-between text-xs text-slate-500 mt-1">
-        <span>
-          {showSign && min > 0 ? "+" : ""}
-          {min}
-          {unit}
-        </span>
-        <span>
-          {showSign && max > 0 ? "+" : ""}
-          {max}
-          {unit}
-        </span>
+        <span className="text-green-400">Oversold</span>
+        <span className="text-red-400">Overbought</span>
       </div>
     </div>
   );
@@ -1763,10 +1732,6 @@ export const PredictorDashboard: React.FC = () => {
 
   // Check if we're in Brazil drought season (Aug-Oct)
   const isBrazilDroughtSeason = [8, 9, 10].includes(marketContext.currentMonth);
-  const monthNames = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
 
   return (
     <div className="min-h-screen bg-slate-950 p-8">
@@ -1898,10 +1863,10 @@ export const PredictorDashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Control Panel */}
+          {/* Live Market Data Panel */}
           <div className="bg-slate-900 rounded-xl p-6 border border-slate-800 shadow-2xl">
             <h2 className="text-lg font-semibold text-slate-200 mb-6 pb-4 border-b border-slate-700">
-              Input Parameters
+              Live Market Data
             </h2>
 
             {/* Sync Live Data Button */}
@@ -1933,82 +1898,52 @@ export const PredictorDashboard: React.FC = () => {
               onContextChange={setMarketContext}
             />
 
-            <SliderControl
-              label="Current Temperature"
-              value={currentTemp}
-              min={15}
-              max={50}
-              unit="°F"
-              onChange={setCurrentTemp}
-            />
+            {/* Data Cards Grid */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <DataCard
+                label="Temperature"
+                value={currentTemp}
+                unit="°F"
+                icon="🌡️"
+                color={currentTemp <= 28 ? "#ef4444" : currentTemp <= 32 ? "#f97316" : currentTemp <= 36 ? "#eab308" : "#22c55e"}
+                isAutoSynced={!!weatherData}
+                sublabel="Winter Haven, FL"
+              />
+              
+              <DataCard
+                label="Hours Below 28°F"
+                value={hoursBelow28}
+                unit="hrs"
+                icon="⏱️"
+                color={hoursBelow28 >= 4 ? "#ef4444" : hoursBelow28 >= 2 ? "#f97316" : "#3b82f6"}
+                sublabel={hoursBelow28 >= 4 ? "Damage threshold reached" : "Frost duration"}
+              />
+              
+              <DataCard
+                label="Inventory"
+                value={currentInventory}
+                unit="M gallons"
+                icon="📦"
+                color={currentInventory < 35 ? "#ef4444" : currentInventory <= 45 ? "#f97316" : "#22c55e"}
+                sublabel={currentInventory < 35 ? "Critical low" : currentInventory <= 45 ? "Below average" : "Normal levels"}
+              />
+              
+              <DataCard
+                label="Brazil Rainfall"
+                value={marketContext.brazilRainfallIndex > 0 ? `+${marketContext.brazilRainfallIndex.toFixed(1)}` : marketContext.brazilRainfallIndex.toFixed(1)}
+                unit="SPI-3"
+                icon="🌧️"
+                color={marketContext.brazilRainfallIndex <= -1.5 ? "#a855f7" : marketContext.brazilRainfallIndex <= -0.5 ? "#f97316" : "#22c55e"}
+                sublabel={isBrazilDroughtSeason ? "Peak Season (Aug-Oct)" : "Off Season"}
+              />
+            </div>
 
-            <SliderControl
-              label="Hours Below 28°F"
-              value={hoursBelow28}
-              min={0}
-              max={12}
-              unit=" hrs"
-              onChange={setHoursBelow28}
-            />
-
-            <SliderControl
-              label="Current Inventory"
-              value={currentInventory}
-              min={20}
-              max={70}
-              unit="M"
-              onChange={setCurrentInventory}
-            />
-
-            {/* RSI Indicator */}
-            <RSISlider
+            {/* RSI Data Card - Full Width */}
+            <RSIDataCard
               value={rsiValue}
-              onChange={(value) => {
-                setRsiValue(value);
-                // Clear auto-sync state when user manually adjusts
-                setIsRsiAutoSynced(false);
-              }}
               isAutoSynced={isRsiAutoSynced}
               syncError={rsiSyncError}
             />
-
-            {/* Brazil Rainfall Index */}
-            <div className="mt-6 pt-6 border-t border-slate-700">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-                  Brazil Supply Monitor
-                </h3>
-                <span
-                  className={`text-xs px-2 py-1 rounded-full ${
-                    isBrazilDroughtSeason
-                      ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
-                      : "bg-slate-700 text-slate-400"
-                  }`}
-                >
-                  {monthNames[marketContext.currentMonth - 1]} (
-                  {isBrazilDroughtSeason ? "Peak Season" : "Off Season"})
-                </span>
-              </div>
-              <SliderControl
-                label="Brazil Rainfall Index (SPI-3)"
-                value={marketContext.brazilRainfallIndex}
-                min={-3}
-                max={3}
-                step={0.1}
-                unit=""
-                onChange={(value) =>
-                  setMarketContext({
-                    ...marketContext,
-                    brazilRainfallIndex: Math.round(value * 10) / 10,
-                  })
-                }
-                showSign
-              />
-              <div className="flex justify-between text-xs text-slate-500 -mt-6">
-                <span className="text-red-400">Extreme Drought</span>
-                <span className="text-green-400">Excess Rain</span>
-              </div>
-            </div>
           </div>
 
           {/* Prediction Results */}
