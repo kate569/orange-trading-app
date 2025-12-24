@@ -14,6 +14,7 @@ import {
   getFrostRiskLevel,
   RSIResult,
 } from "../services/marketDataStream";
+import { NewsFeed } from "./NewsFeed";
 
 // localStorage keys for persistence
 const FROST_STORAGE_KEY = "oj_frost_tracker";
@@ -1975,6 +1976,9 @@ export const PredictorDashboard: React.FC = () => {
 
         {/* Strategy Summary Table */}
         <StrategySummaryTable />
+
+        {/* News Feed */}
+        <NewsFeed />
       </div>
     </div>
   );
