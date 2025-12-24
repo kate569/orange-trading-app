@@ -15,6 +15,7 @@ import {
   RSIResult,
 } from "../services/marketDataStream";
 import { NewsFeed } from "./NewsFeed";
+import { AnalystRationale } from "./AnalystRationale";
 
 // localStorage keys for persistence
 const FROST_STORAGE_KEY = "oj_frost_tracker";
@@ -1968,8 +1969,13 @@ export const PredictorDashboard: React.FC = () => {
               {/* Win Probability Meter */}
               <WinProbabilityMeter probability={signal.winProbability} />
 
-              {/* Logic Insight */}
-              <LogicInsight insight={signal.insight} />
+              {/* Strategic Analysis */}
+              <AnalystRationale
+                rsi={rsiValue}
+                inventory={currentInventory}
+                temperature={currentTemp}
+                recommendation={signal.recommendedAction}
+              />
             </div>
           </div>
         </div>
