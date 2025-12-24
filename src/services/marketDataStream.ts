@@ -185,6 +185,138 @@ export function formatSyncTime(date: Date): string {
 }
 
 /**
+ * RSI calculation result interface
+ */
+export interface RSIResult {
+  value: number;
+  timestamp: Date;
+  symbol: string;
+  period: number;
+  error?: string;
+}
+
+/**
+ * Calculates RSI (Relative Strength Index) from price data
+ * RSI = 100 - (100 / (1 + RS))
+ * where RS = Average Gain / Average Loss over the period
+ */
+function calculateRSI(closingPrices: number[], period: number = 14): number {
+  if (closingPrices.length < period + 1) {
+    throw new Error(`Need at least ${period + 1} data points for RSI calculation`);
+  }
+
+  // Calculate daily price changes
+  const changes: number[] = [];
+  for (let i = 1; i < closingPrices.length; i++) {
+    changes.push(closingPrices[i] - closingPrices[i - 1]);
+  }
+
+  // Separate gains and losses
+  const gains = changes.map(change => change > 0 ? change : 0);
+  const losses = changes.map(change => change < 0 ? Math.abs(change) : 0);
+
+  // Calculate initial average gain and loss (simple average for first period)
+  let avgGain = gains.slice(0, period).reduce((sum, g) => sum + g, 0) / period;
+  let avgLoss = losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
+
+  // Use Wilder's smoothing method for subsequent periods
+  for (let i = period; i < gains.length; i++) {
+    avgGain = ((avgGain * (period - 1)) + gains[i]) / period;
+    avgLoss = ((avgLoss * (period - 1)) + losses[i]) / period;
+  }
+
+  // Handle edge case where there are no losses
+  if (avgLoss === 0) {
+    return 100;
+  }
+
+  // Calculate RS and RSI
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+
+  return Math.round(rsi);
+}
+
+/**
+ * Fetches live market RSI for Orange Juice Futures (OJ=F)
+ * Uses Yahoo Finance API to get historical price data and calculates 14-day RSI
+ */
+export async function fetchLiveMarketRSI(): Promise<RSIResult> {
+  const symbol = "OJ=F";
+  const period = 14;
+  
+  // We need at least 30 days of data to calculate a reliable 14-day RSI
+  const now = Math.floor(Date.now() / 1000);
+  const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
+  
+  // Yahoo Finance API endpoint for historical data
+  // Using a CORS proxy for browser compatibility
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${thirtyDaysAgo}&period2=${now}&interval=1d`;
+  
+  try {
+    // Try direct Yahoo Finance API first
+    let response: Response;
+    let data: any;
+    
+    try {
+      response = await fetch(yahooUrl);
+      if (!response.ok) {
+        throw new Error(`Yahoo API error: ${response.status}`);
+      }
+      data = await response.json();
+    } catch (directError) {
+      // If direct fails (likely due to CORS), try with a CORS proxy
+      const corsProxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+      response = await fetch(corsProxyUrl);
+      
+      if (!response.ok) {
+        throw new Error(`CORS proxy error: ${response.status}`);
+      }
+      data = await response.json();
+    }
+    
+    // Extract closing prices from Yahoo Finance response
+    const result = data?.chart?.result?.[0];
+    if (!result) {
+      throw new Error("No data returned from Yahoo Finance");
+    }
+    
+    const closingPrices = result?.indicators?.quote?.[0]?.close;
+    if (!closingPrices || closingPrices.length === 0) {
+      throw new Error("No closing prices in response");
+    }
+    
+    // Filter out null values (market closed days)
+    const validPrices = closingPrices.filter((price: number | null) => price !== null);
+    
+    if (validPrices.length < period + 1) {
+      throw new Error(`Insufficient price data: got ${validPrices.length}, need ${period + 1}`);
+    }
+    
+    // Calculate the 14-day RSI
+    const rsiValue = calculateRSI(validPrices, period);
+    
+    return {
+      value: rsiValue,
+      timestamp: new Date(),
+      symbol,
+      period,
+    };
+  } catch (error) {
+    console.error("Failed to fetch RSI data:", error);
+    
+    // Return a fallback value with error indication
+    return {
+      value: 50, // Neutral fallback
+      timestamp: new Date(),
+      symbol,
+      period,
+      error: error instanceof Error ? error.message : "Unknown error fetching RSI",
+    };
+  }
+}
+
+/**
  * Gets frost risk level based on temperature and conditions
  */
 export function getFrostRiskLevel(

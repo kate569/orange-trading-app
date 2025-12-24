@@ -7,10 +7,12 @@ import {
 } from "../calculateMarketSignal.browser";
 import {
   fetchLiveMarketData,
+  fetchLiveMarketRSI,
   formatSyncTime,
   WeatherData,
   LiveWeatherResponse,
   getFrostRiskLevel,
+  RSIResult,
 } from "../services/marketDataStream";
 
 // localStorage keys for persistence
@@ -226,9 +228,11 @@ interface SliderControlProps {
 interface RSISliderProps {
   value: number;
   onChange: (value: number) => void;
+  isAutoSynced?: boolean;
+  syncError?: string;
 }
 
-const RSISlider: React.FC<RSISliderProps> = ({ value, onChange }) => {
+const RSISlider: React.FC<RSISliderProps> = ({ value, onChange, isAutoSynced = false, syncError }) => {
   const isOverbought = value > 70;
   const isOversold = value < 30;
 
@@ -248,9 +252,22 @@ const RSISlider: React.FC<RSISliderProps> = ({ value, onChange }) => {
   return (
     <div className="mb-8">
       <div className="flex justify-between items-center mb-2">
-        <label className="text-slate-300 text-sm font-medium uppercase tracking-wider">
-          Market RSI (14-day)
-        </label>
+        <div className="flex items-center gap-2">
+          <label className="text-slate-300 text-sm font-medium uppercase tracking-wider">
+            Market RSI (14-day)
+          </label>
+          {isAutoSynced && (
+            <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+              Auto-syncing
+            </span>
+          )}
+          {syncError && !isAutoSynced && (
+            <span className="text-xs text-yellow-500" title={syncError}>
+              ⚠️ Manual
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span
             className="text-xs font-semibold px-2 py-0.5 rounded"
@@ -1490,6 +1507,8 @@ export const PredictorDashboard: React.FC = () => {
 
   // RSI state - load from localStorage
   const [rsiValue, setRsiValue] = useState<number>(() => loadRsiValue());
+  const [isRsiAutoSynced, setIsRsiAutoSynced] = useState<boolean>(false);
+  const [rsiSyncError, setRsiSyncError] = useState<string | undefined>(undefined);
 
   // Check if data is stale
   const dataIsStale = useMemo(
@@ -1630,7 +1649,12 @@ export const PredictorDashboard: React.FC = () => {
   const handleSyncLiveData = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const response: LiveWeatherResponse = await fetchLiveMarketData();
+      // Fetch both weather data and RSI in parallel
+      const [response, rsiResult]: [LiveWeatherResponse, RSIResult] = await Promise.all([
+        fetchLiveMarketData(),
+        fetchLiveMarketRSI(),
+      ]);
+      
       const syncTimestamp = Date.now();
       const syncTimeFormatted = formatSyncTime(response.marketData.timestamp);
 
@@ -1640,6 +1664,19 @@ export const PredictorDashboard: React.FC = () => {
       // Only update temperature from live weather data
       // Inventory and Hurricane settings are manual controls - don't override them
       setCurrentTemp(response.marketData.currentTemp);
+      
+      // Update RSI from live market data
+      if (!rsiResult.error) {
+        setRsiValue(rsiResult.value);
+        setIsRsiAutoSynced(true);
+        setRsiSyncError(undefined);
+        // Also save to localStorage
+        saveRsiValue(rsiResult.value);
+      } else {
+        // Keep the current value but note the error
+        setRsiSyncError(rsiResult.error);
+        setIsRsiAutoSynced(false);
+      }
       
       // Keep current market context unchanged (inventory slider, hurricane toggle are manual)
       // Only the temperature is updated from the API
@@ -1663,7 +1700,7 @@ export const PredictorDashboard: React.FC = () => {
       saveMarketData(dataToSave);
 
       // Show success toast
-      setToastMessage("Data Synced");
+      setToastMessage(rsiResult.error ? "Data Synced (RSI unavailable)" : "Data Synced");
       setToastVariant("success");
       setShowToast(true);
     } catch (error) {
@@ -1924,7 +1961,16 @@ export const PredictorDashboard: React.FC = () => {
             />
 
             {/* RSI Indicator */}
-            <RSISlider value={rsiValue} onChange={setRsiValue} />
+            <RSISlider
+              value={rsiValue}
+              onChange={(value) => {
+                setRsiValue(value);
+                // Clear auto-sync state when user manually adjusts
+                setIsRsiAutoSynced(false);
+              }}
+              isAutoSynced={isRsiAutoSynced}
+              syncError={rsiSyncError}
+            />
 
             {/* Brazil Rainfall Index */}
             <div className="mt-6 pt-6 border-t border-slate-700">
