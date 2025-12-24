@@ -17,8 +17,8 @@ interface RSSResponse {
   }>;
 }
 
-// RSS feed URL for OJ futures news
-const RSS_FEED_URL = "https://news.google.com/rss/search?q=orange+juice+futures";
+// RSS feed URL for OJ futures news (last 30 days only)
+const RSS_FEED_URL = "https://news.google.com/rss/search?q=orange+juice+prices+when:30d&hl=en-US&gl=US&ceid=US:en";
 const NEWS_API_URL = "https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(RSS_FEED_URL);
 
 // Format relative time (e.g., "2 hours ago")
