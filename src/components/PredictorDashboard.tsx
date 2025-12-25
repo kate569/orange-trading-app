@@ -1527,9 +1527,8 @@ export const PredictorDashboard: React.FC = () => {
   const [isRsiAutoSynced, setIsRsiAutoSynced] = useState<boolean>(false);
   const [rsiSyncError, setRsiSyncError] = useState<string | undefined>(undefined);
 
-  // Market context data state (automated)
-  const [contextData, setContextData] = useState<MarketContextData | null>(null);
-  const [isContextLoading, setIsContextLoading] = useState<boolean>(false);
+  // Current price state (OJ=F futures price)
+  const [currentPrice, setCurrentPrice] = useState<number>(350); // Default fallback price
 
   // Check if data is stale
   const dataIsStale = useMemo(
@@ -2053,19 +2052,7 @@ export const PredictorDashboard: React.FC = () => {
                 inventory={currentInventory}
                 temperature={currentTemp}
                 recommendation={signal.recommendedAction}
-                isHurricaneActive={contextData?.hurricane.isActive}
-                isLaNinaActive={contextData?.laNina.isActive}
-                hurricaneLatestTitle={contextData?.hurricane.latestTitle}
-                laNinaSst={contextData?.laNina.sst}
-              />
-
-              {/* Trade Execution / Risk Management */}
-              <RiskRewardCard
-                currentPrice={OJ_FUTURES_BASELINE_PRICE}
-                recommendation={signal.recommendedAction}
-                winProbability={signal.winProbability}
-                isHurricaneActive={contextData?.hurricane.isActive ?? false}
-                isLaNinaActive={contextData?.laNina.isActive ?? false}
+                price={currentPrice}
               />
             </div>
           </div>

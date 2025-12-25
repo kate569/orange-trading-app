@@ -5,86 +5,7 @@ interface AnalystRationaleProps {
   inventory: number;
   temperature: number;
   recommendation: string;
-  isHurricaneActive?: boolean;
-  isLaNinaActive?: boolean;
-  hurricaneLatestTitle?: string;
-  laNinaSst?: number;
-}
-
-interface SlTpResult {
-  stopLoss: number;
-  takeProfit: number;
-  riskDistance: number;
-  rewardDistance: number;
-  riskRewardRatio: string;
-}
-
-// Calculate Stop Loss, Take Profit, and Risk/Reward Ratio
-function calculateSlTp(
-  rsi: number,
-  inventory: number,
-  temperature: number,
-  recommendation: string
-): SlTpResult {
-  // Assume a current price of $400 (typical OJ futures price)
-  const currentPrice = 400;
-  
-  // Determine stop loss and take profit percentages based on recommendation and conditions
-  let stopLossPercent = 0.05; // Default 5% stop loss
-  let takeProfitPercent = 0.10; // Default 10% take profit (1:2 risk/reward)
-  
-  const action = recommendation.toUpperCase();
-  
-  if (action.includes("BUY") || action.includes("LONG") || action.includes("DOUBLE")) {
-    // Bullish scenario
-    if (temperature <= 28 && inventory < 40) {
-      // High conviction frost + low inventory
-      stopLossPercent = 0.04; // Tighter stop
-      takeProfitPercent = 0.15; // Higher target (1:3.75 risk/reward)
-    } else if (rsi <= 30) {
-      // Oversold
-      stopLossPercent = 0.05;
-      takeProfitPercent = 0.12; // (1:2.4 risk/reward)
-    } else {
-      // Standard bullish
-      stopLossPercent = 0.06;
-      takeProfitPercent = 0.12; // (1:2 risk/reward)
-    }
-  } else if (action.includes("SELL") || action.includes("SHORT") || action.includes("REDUCE")) {
-    // Bearish scenario
-    if (rsi >= 70 && inventory > 55) {
-      // Overbought + high inventory
-      stopLossPercent = 0.04;
-      takeProfitPercent = 0.10; // (1:2.5 risk/reward)
-    } else {
-      stopLossPercent = 0.05;
-      takeProfitPercent = 0.10; // (1:2 risk/reward)
-    }
-  } else {
-    // Neutral/Hold scenario
-    stopLossPercent = 0.03;
-    takeProfitPercent = 0.06; // (1:2 risk/reward)
-  }
-  
-  // Calculate actual price levels
-  const stopLoss = currentPrice * (1 - stopLossPercent);
-  const takeProfit = currentPrice * (1 + takeProfitPercent);
-  
-  // Calculate distances
-  const riskDistance = currentPrice - stopLoss;
-  const rewardDistance = takeProfit - currentPrice;
-  
-  // Calculate Risk/Reward Ratio (format as "1:X.X")
-  const ratio = rewardDistance / riskDistance;
-  const riskRewardRatio = `1:${ratio.toFixed(1)}`;
-  
-  return {
-    stopLoss: Math.round(stopLoss * 100) / 100,
-    takeProfit: Math.round(takeProfit * 100) / 100,
-    riskDistance: Math.round(riskDistance * 100) / 100,
-    rewardDistance: Math.round(rewardDistance * 100) / 100,
-    riskRewardRatio,
-  };
+  price: number;
 }
 
 // Generate RSI analysis text
@@ -298,30 +219,14 @@ export const AnalystRationale: React.FC<AnalystRationaleProps> = ({
   inventory,
   temperature,
   recommendation,
-  isHurricaneActive = false,
-  isLaNinaActive = false,
-  hurricaneLatestTitle,
-  laNinaSst,
+  price,
 }) => {
   const [isCopied, setIsCopied] = React.useState(false);
 
   const technical = getTechnicalSetup(rsi);
-  const fundamental = getFundamentalDrivers(
-    inventory, 
-    temperature, 
-    isHurricaneActive, 
-    isLaNinaActive,
-    hurricaneLatestTitle,
-    laNinaSst
-  );
-  const verdict = getVerdict(
-    recommendation, 
-    rsi, 
-    inventory, 
-    temperature,
-    isHurricaneActive,
-    isLaNinaActive
-  );
+  const fundamental = getFundamentalDrivers(inventory, temperature);
+  const verdict = getVerdict(recommendation, rsi, inventory, temperature);
+  const slTp = calculateSlTp(price, recommendation);
 
   const getSentimentColor = (sentiment: "bullish" | "bearish" | "neutral") => {
     switch (sentiment) {
