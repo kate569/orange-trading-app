@@ -193,6 +193,8 @@ export const AnalystRationale: React.FC<AnalystRationaleProps> = ({
   recommendation,
   price,
 }) => {
+  const [isCopied, setIsCopied] = React.useState(false);
+
   const technical = getTechnicalSetup(rsi);
   const fundamental = getFundamentalDrivers(inventory, temperature);
   const verdict = getVerdict(recommendation, rsi, inventory, temperature);
@@ -217,6 +219,68 @@ export const AnalystRationale: React.FC<AnalystRationaleProps> = ({
         return "📉";
       default:
         return "📊";
+    }
+  };
+
+  // Extract first sentence from verdict
+  const getFirstSentence = (text: string): string => {
+    const match = text.match(/^[^.!?]+[.!?]/);
+    return match ? match[0].trim() : text.split('.')[0].trim();
+  };
+
+  // Determine BUY/SELL based on recommendation
+  const getSignalType = (): string => {
+    const action = recommendation.toUpperCase();
+    if (action.includes("SELL") || action.includes("SHORT") || action.includes("REDUCE") || action.includes("TAKE PROFIT")) {
+      return "SELL";
+    }
+    return "BUY";
+  };
+
+  // Generate formatted signal string for clipboard
+  const generateSignalString = (): string => {
+    const signalType = getSignalType();
+    const rationale = getFirstSentence(verdict);
+    
+    // Generate reasonable TP and SL based on signal type
+    const price = "Market Price";
+    const tp = signalType === "BUY" ? "+8% Target" : "-5% Target";
+    const sl = signalType === "BUY" ? "-3% Stop" : "+4% Stop";
+    
+    return `OJ FUTURES SIGNAL: ${signalType} @ ${price} | TP: ${tp} | SL: ${sl} | Rationale: ${rationale}`;
+  };
+
+  // Handle copy to clipboard
+  const handleCopySignal = async () => {
+    const signalText = generateSignalString();
+    
+    try {
+      await navigator.clipboard.writeText(signalText);
+      setIsCopied(true);
+      
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setIsCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = signalText;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setIsCopied(true);
+        setTimeout(() => {
+          setIsCopied(false);
+        }, 2000);
+      } catch (fallbackErr) {
+        console.error("Fallback copy failed:", fallbackErr);
+      }
+      document.body.removeChild(textArea);
     }
   };
 
