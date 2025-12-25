@@ -192,6 +192,7 @@ export interface RSIResult {
   timestamp: Date;
   symbol: string;
   period: number;
+  currentPrice?: number;
   error?: string;
 }
 
@@ -296,11 +297,15 @@ export async function fetchLiveMarketRSI(): Promise<RSIResult> {
     // Calculate the 14-day RSI
     const rsiValue = calculateRSI(validPrices, period);
     
+    // Get the current price (last closing price)
+    const currentPrice = validPrices[validPrices.length - 1];
+    
     return {
       value: rsiValue,
       timestamp: new Date(),
       symbol,
       period,
+      currentPrice,
     };
   } catch (error) {
     console.error("Failed to fetch RSI data:", error);
