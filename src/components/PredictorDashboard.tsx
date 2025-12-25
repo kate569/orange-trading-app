@@ -20,7 +20,7 @@ import {
 } from "../services/contextData";
 import { NewsFeed } from "./NewsFeed";
 import { AnalystRationale } from "./AnalystRationale";
-import { RiskRewardCard } from "./RiskRewardCard";
+import { PriceChart } from "./PriceChart";
 
 // localStorage keys for persistence
 const FROST_STORAGE_KEY = "oj_frost_tracker";
@@ -2068,6 +2068,16 @@ export const PredictorDashboard: React.FC = () => {
                 isLaNinaActive={contextData?.laNina.isActive ?? false}
               />
             </div>
+          </div>
+        </div>
+
+        {/* Price Chart */}
+        <div className="bg-gray-800 rounded-xl p-4 shadow-lg mt-6 h-96">
+          <h3 className="text-gray-400 mb-4 text-sm font-semibold uppercase tracking-wider">
+            Price Action (30 Days)
+          </h3>
+          <div className="h-80">
+            <PriceChart />
           </div>
         </div>
 
