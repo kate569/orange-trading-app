@@ -20,6 +20,7 @@ import {
 } from "../services/contextData";
 import { NewsFeed } from "./NewsFeed";
 import { AnalystRationale } from "./AnalystRationale";
+import { RiskRewardCard } from "./RiskRewardCard";
 
 // localStorage keys for persistence
 const FROST_STORAGE_KEY = "oj_frost_tracker";
@@ -29,6 +30,7 @@ const CRITICAL_FROST_HOURS = 4;
 const CRITICAL_TEMP_THRESHOLD = 28;
 const RESET_TEMP_THRESHOLD = 32;
 const STALE_DATA_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+const OJ_FUTURES_BASELINE_PRICE = 3.50; // $3.50 per lb - typical OJ futures price
 
 interface FrostTrackerData {
   accumulatedSeconds: number;
@@ -2051,6 +2053,15 @@ export const PredictorDashboard: React.FC = () => {
                 isLaNinaActive={contextData?.laNina.isActive}
                 hurricaneLatestTitle={contextData?.hurricane.latestTitle}
                 laNinaSst={contextData?.laNina.sst}
+              />
+
+              {/* Trade Execution / Risk Management */}
+              <RiskRewardCard
+                currentPrice={OJ_FUTURES_BASELINE_PRICE}
+                recommendation={signal.recommendedAction}
+                winProbability={signal.winProbability}
+                isHurricaneActive={contextData?.hurricane.isActive ?? false}
+                isLaNinaActive={contextData?.laNina.isActive ?? false}
               />
             </div>
           </div>
