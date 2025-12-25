@@ -260,10 +260,16 @@ export function calculateMarketSignalBrowser(
     recommendedAction = "Monitor";
   }
 
-  // Hurricane warning without false alarm condition
+  // Hurricane warning without false alarm condition - SUPPLY SHOCK BOOST
   let hurricaneEffect: string | undefined;
   if (context.isHurricaneActive && !context.hurricaneCenterFarFromPolk) {
-    hurricaneEffect = "Hurricane warning active - monitoring for potential impact on Polk County";
+    // Hurricane warning significantly increases bullish probability (supply shock)
+    const hurricaneBoost = 1.25; // 25% boost to win probability
+    winProbability *= hurricaneBoost;
+    hurricaneEffect = `Hurricane warning active - potential direct impact on Polk County. Supply shock risk increases win probability by ${(hurricaneBoost - 1) * 100}%`;
+    
+    // Cap again after hurricane boost
+    winProbability = Math.min(winProbability, MAX_WIN_PROBABILITY);
   }
 
   // Brazil drought info (outside of season or above threshold)
