@@ -14,6 +14,10 @@ import {
   getFrostRiskLevel,
   RSIResult,
 } from "../services/marketDataStream";
+import {
+  fetchMarketContextData,
+  MarketContextData,
+} from "../services/contextData";
 import { NewsFeed } from "./NewsFeed";
 import { AnalystRationale } from "./AnalystRationale";
 
@@ -1041,57 +1045,97 @@ const SyncButton: React.FC<SyncButtonProps> = ({
 };
 
 interface MarketContextSectionProps {
-  context: MarketContextParams;
-  onContextChange: (context: MarketContextParams) => void;
+  contextData: MarketContextData | null;
+  isLoading: boolean;
 }
 
 const MarketContextSection: React.FC<MarketContextSectionProps> = ({
-  context,
-  onContextChange,
+  contextData,
+  isLoading,
 }) => {
+  const getStatusBadge = (
+    label: string,
+    isActive: boolean,
+    isLoading: boolean,
+    sst?: number,
+    error?: string
+  ) => {
+    const statusColor = isActive ? "#ef4444" : "#22c55e";
+    const statusText = isActive ? "ACTIVE" : "SAFE";
+    const bgColor = isActive ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)";
+
+    return (
+      <div
+        className="bg-slate-800/50 rounded-lg p-4 border transition-all duration-300"
+        style={{
+          borderColor: isActive ? "#ef444440" : "#22c55e40",
+          backgroundColor: bgColor,
+          boxShadow: isActive ? "0 0 15px rgba(239, 68, 68, 0.1)" : "0 0 15px rgba(34, 197, 94, 0.1)",
+        }}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+              {label}
+            </span>
+            {!isLoading && !error && (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 text-xs font-semibold bg-green-500/20 text-green-400 rounded-full border border-green-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                Live
+              </span>
+            )}
+            {error && (
+              <span className="text-xs text-yellow-500" title={error}>
+                ⚠️
+              </span>
+            )}
+          </div>
+          {isLoading ? (
+            <svg className="w-4 h-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <span
+              className="text-xs font-bold px-2 py-1 rounded"
+              style={{
+                backgroundColor: `${statusColor}20`,
+                color: statusColor,
+              }}
+            >
+              {statusText}
+            </span>
+          )}
+        </div>
+        {!isLoading && sst !== undefined && (
+          <div className="text-xs text-slate-500 mt-1">
+            SST: {sst.toFixed(2)}°C {isActive ? "< 26.5°C" : "≥ 26.5°C"}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 mb-6">
+    <div className="mb-6">
       <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
         Market Context
       </h3>
-      <div className="space-y-4">
-        <ToggleSwitch
-          label="La Niña Active"
-          sublabel="ONI < -0.5"
-          checked={context.isLaNina}
-          onChange={(checked) =>
-            onContextChange({ ...context, isLaNina: checked })
-          }
-          color="blue"
-        />
-        <div>
-          <ToggleSwitch
-            label="Hurricane Warning"
-            checked={context.isHurricaneActive}
-            onChange={(checked) =>
-              onContextChange({
-                ...context,
-                isHurricaneActive: checked,
-                hurricaneCenterFarFromPolk: checked
-                  ? context.hurricaneCenterFarFromPolk
-                  : false,
-              })
-            }
-            color="red"
-          />
-          {context.isHurricaneActive && (
-            <Checkbox
-              label="Is center > 100 miles from Polk County?"
-              checked={context.hurricaneCenterFarFromPolk}
-              onChange={(checked) =>
-                onContextChange({
-                  ...context,
-                  hurricaneCenterFarFromPolk: checked,
-                })
-              }
-            />
-          )}
-        </div>
+      <div className="space-y-3">
+        {getStatusBadge(
+          "La Niña Status",
+          contextData?.laNina.isActive ?? false,
+          isLoading,
+          contextData?.laNina.sst,
+          contextData?.laNina.error
+        )}
+        {getStatusBadge(
+          "Hurricane Warning",
+          contextData?.hurricane.isActive ?? false,
+          isLoading,
+          undefined,
+          contextData?.hurricane.error
+        )}
       </div>
     </div>
   );
@@ -1481,6 +1525,10 @@ export const PredictorDashboard: React.FC = () => {
   const [isRsiAutoSynced, setIsRsiAutoSynced] = useState<boolean>(false);
   const [rsiSyncError, setRsiSyncError] = useState<string | undefined>(undefined);
 
+  // Market context data state (automated)
+  const [contextData, setContextData] = useState<MarketContextData | null>(null);
+  const [isContextLoading, setIsContextLoading] = useState<boolean>(false);
+
   // Check if data is stale
   const dataIsStale = useMemo(
     () => lastSyncTimestamp > 0 && isDataStale(lastSyncTimestamp),
@@ -1491,6 +1539,30 @@ export const PredictorDashboard: React.FC = () => {
   useEffect(() => {
     saveRsiValue(rsiValue);
   }, [rsiValue]);
+
+  // Fetch market context data on mount
+  useEffect(() => {
+    const fetchContextData = async () => {
+      setIsContextLoading(true);
+      try {
+        const data = await fetchMarketContextData();
+        setContextData(data);
+        
+        // Update market context based on fetched data
+        setMarketContext((prev) => ({
+          ...prev,
+          isLaNina: data.laNina.isActive,
+          isHurricaneActive: data.hurricane.isActive,
+        }));
+      } catch (error) {
+        console.error("Failed to fetch context data:", error);
+      } finally {
+        setIsContextLoading(false);
+      }
+    };
+
+    fetchContextData();
+  }, []);
 
   // Background timer for frost tracking
   useEffect(() => {
@@ -1896,8 +1968,8 @@ export const PredictorDashboard: React.FC = () => {
 
             {/* Market Context Section */}
             <MarketContextSection
-              context={marketContext}
-              onContextChange={setMarketContext}
+              contextData={contextData}
+              isLoading={isContextLoading}
             />
 
             {/* Data Cards Grid */}
