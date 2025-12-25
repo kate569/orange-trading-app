@@ -1482,6 +1482,9 @@ export const PredictorDashboard: React.FC = () => {
   const [isRsiAutoSynced, setIsRsiAutoSynced] = useState<boolean>(false);
   const [rsiSyncError, setRsiSyncError] = useState<string | undefined>(undefined);
 
+  // Current price state (OJ=F futures price)
+  const [currentPrice, setCurrentPrice] = useState<number>(350); // Default fallback price
+
   // Check if data is stale
   const dataIsStale = useMemo(
     () => lastSyncTimestamp > 0 && isDataStale(lastSyncTimestamp),
@@ -1644,6 +1647,10 @@ export const PredictorDashboard: React.FC = () => {
         setRsiSyncError(undefined);
         // Also save to localStorage
         saveRsiValue(rsiResult.value);
+        // Update current price if available
+        if (rsiResult.currentPrice) {
+          setCurrentPrice(rsiResult.currentPrice);
+        }
       } else {
         // Keep the current value but note the error
         setRsiSyncError(rsiResult.error);
@@ -1976,6 +1983,7 @@ export const PredictorDashboard: React.FC = () => {
                 inventory={currentInventory}
                 temperature={currentTemp}
                 recommendation={signal.recommendedAction}
+                price={currentPrice}
               />
             </div>
           </div>
