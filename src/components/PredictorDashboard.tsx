@@ -2047,6 +2047,10 @@ export const PredictorDashboard: React.FC = () => {
                 inventory={currentInventory}
                 temperature={currentTemp}
                 recommendation={signal.recommendedAction}
+                isHurricaneActive={contextData?.hurricane.isActive}
+                isLaNinaActive={contextData?.laNina.isActive}
+                hurricaneLatestTitle={contextData?.hurricane.latestTitle}
+                laNinaSst={contextData?.laNina.sst}
               />
             </div>
           </div>
