@@ -5,6 +5,7 @@ interface AnalystRationaleProps {
   inventory: number;
   temperature: number;
   recommendation: string;
+  price: number;
 }
 
 // Generate RSI analysis text
@@ -153,17 +154,51 @@ function getVerdict(
   return `MONITOR & WAIT. Conditions do not favor immediate action. The technical and fundamental picture is mixed, suggesting a wait-and-see approach. Key levels to watch: RSI breaking above 50 (bullish) or below 30 (buying opportunity). On fundamentals, monitor inventory reports and weather forecasts for Florida. Be ready to act quickly when a clear setup emerges.`;
 }
 
+// Calculate Stop Loss and Take Profit
+function calculateSlTp(
+  price: number,
+  recommendation: string
+): { sl: number; tp: number; signal: "BUY" | "SELL" | "HOLD" } | null {
+  const action = recommendation.toUpperCase();
+
+  if (action.includes("BUY") || action.includes("LONG") || action.includes("DOUBLE")) {
+    return {
+      signal: "BUY",
+      sl: price * 0.97, // -3%
+      tp: price * 1.06, // +6%
+    };
+  }
+
+  if (action.includes("SELL") || action.includes("SHORT") || action.includes("REDUCE")) {
+    return {
+      signal: "SELL",
+      sl: price * 1.03, // +3%
+      tp: price * 0.94, // -6%
+    };
+  }
+
+  // HOLD or other - don't show SL/TP
+  return null;
+}
+
+// Format price as $123.45
+function formatPrice(price: number): string {
+  return `$${price.toFixed(2)}`;
+}
+
 export const AnalystRationale: React.FC<AnalystRationaleProps> = ({
   rsi,
   inventory,
   temperature,
   recommendation,
+  price,
 }) => {
   const [isCopied, setIsCopied] = React.useState(false);
 
   const technical = getTechnicalSetup(rsi);
   const fundamental = getFundamentalDrivers(inventory, temperature);
   const verdict = getVerdict(recommendation, rsi, inventory, temperature);
+  const slTp = calculateSlTp(price, recommendation);
 
   const getSentimentColor = (sentiment: "bullish" | "bearish" | "neutral") => {
     switch (sentiment) {
@@ -309,20 +344,47 @@ export const AnalystRationale: React.FC<AnalystRationaleProps> = ({
           </p>
         </div>
 
-        {/* Copy Signal Button */}
-        <div className="mt-4 pt-4 border-t border-slate-700">
-          <button
-            onClick={handleCopySignal}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg 
-                       text-gray-400 hover:text-white transition-all duration-200
-                       bg-slate-800/30 hover:bg-slate-700/50 border border-slate-700 hover:border-slate-600"
+        {/* Stop Loss & Take Profit */}
+        {slTp && (
+          <div
+            className="mt-4 rounded-lg p-4 border-2"
+            style={{
+              background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)",
+              borderColor: slTp.signal === "BUY" ? "rgba(34, 197, 94, 0.4)" : "rgba(239, 68, 68, 0.4)",
+            }}
           >
-            <span className="text-lg">📋</span>
-            <span className="text-sm font-medium">
-              {isCopied ? "Copied! ✓" : "Copy Signal"}
-            </span>
-          </button>
-        </div>
+            <div className="flex items-center gap-2 mb-3">
+              <span>{slTp.signal === "BUY" ? "🎯" : "🛡️"}</span>
+              <h4 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
+                Risk Management Levels
+              </h4>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-700">
+                <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+                  Stop Loss
+                </div>
+                <div className="text-lg font-bold text-red-400">
+                  {formatPrice(slTp.sl)}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {slTp.signal === "BUY" ? "-3%" : "+3%"}
+                </div>
+              </div>
+              <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-700">
+                <div className="text-xs text-slate-400 uppercase tracking-wide mb-1">
+                  Take Profit
+                </div>
+                <div className="text-lg font-bold text-green-400">
+                  {formatPrice(slTp.tp)}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {slTp.signal === "BUY" ? "+6%" : "-6%"}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
