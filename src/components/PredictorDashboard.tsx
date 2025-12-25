@@ -1717,6 +1717,10 @@ export const PredictorDashboard: React.FC = () => {
         setRsiSyncError(undefined);
         // Also save to localStorage
         saveRsiValue(rsiResult.value);
+        // Update current price if available
+        if (rsiResult.currentPrice) {
+          setCurrentPrice(rsiResult.currentPrice);
+        }
       } else {
         // Keep the current value but note the error
         setRsiSyncError(rsiResult.error);
@@ -1904,7 +1908,7 @@ export const PredictorDashboard: React.FC = () => {
         <div className="mb-10">
           <div className="flex items-center gap-3 flex-wrap">
             <h1
-              className={`text-3xl font-bold transition-colors duration-300 ${
+              className={`text-3xl font-bold tracking-wide transition-colors duration-300 ${
                 isFreezingAlert
                   ? "text-red-400 animate-text-pulse-red"
                   : "text-white"
@@ -1975,7 +1979,7 @@ export const PredictorDashboard: React.FC = () => {
             />
 
             {/* Data Cards Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <DataCard
                 label="Temperature"
                 value={currentTemp}
@@ -2072,6 +2076,9 @@ export const PredictorDashboard: React.FC = () => {
 
         {/* News Feed */}
         <NewsFeed />
+
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );
