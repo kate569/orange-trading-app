@@ -16,6 +16,7 @@ import {
 } from "../services/marketDataStream";
 import { NewsFeed } from "./NewsFeed";
 import { AnalystRationale } from "./AnalystRationale";
+import { Footer } from "./Footer";
 
 // localStorage keys for persistence
 const FROST_STORAGE_KEY = "oj_frost_tracker";
@@ -1481,6 +1482,9 @@ export const PredictorDashboard: React.FC = () => {
   const [isRsiAutoSynced, setIsRsiAutoSynced] = useState<boolean>(false);
   const [rsiSyncError, setRsiSyncError] = useState<string | undefined>(undefined);
 
+  // Current price state (OJ=F futures price)
+  const [currentPrice, setCurrentPrice] = useState<number>(350); // Default fallback price
+
   // Check if data is stale
   const dataIsStale = useMemo(
     () => lastSyncTimestamp > 0 && isDataStale(lastSyncTimestamp),
@@ -1643,6 +1647,10 @@ export const PredictorDashboard: React.FC = () => {
         setRsiSyncError(undefined);
         // Also save to localStorage
         saveRsiValue(rsiResult.value);
+        // Update current price if available
+        if (rsiResult.currentPrice) {
+          setCurrentPrice(rsiResult.currentPrice);
+        }
       } else {
         // Keep the current value but note the error
         setRsiSyncError(rsiResult.error);
@@ -1830,7 +1838,7 @@ export const PredictorDashboard: React.FC = () => {
         <div className="mb-10">
           <div className="flex items-center gap-3 flex-wrap">
             <h1
-              className={`text-3xl font-bold transition-colors duration-300 ${
+              className={`text-3xl font-bold tracking-wide transition-colors duration-300 ${
                 isFreezingAlert
                   ? "text-red-400 animate-text-pulse-red"
                   : "text-white"
@@ -1901,7 +1909,7 @@ export const PredictorDashboard: React.FC = () => {
             />
 
             {/* Data Cards Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <DataCard
                 label="Temperature"
                 value={currentTemp}
@@ -1975,6 +1983,7 @@ export const PredictorDashboard: React.FC = () => {
                 inventory={currentInventory}
                 temperature={currentTemp}
                 recommendation={signal.recommendedAction}
+                price={currentPrice}
               />
             </div>
           </div>
@@ -1985,6 +1994,9 @@ export const PredictorDashboard: React.FC = () => {
 
         {/* News Feed */}
         <NewsFeed />
+
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );
