@@ -1913,7 +1913,7 @@ export const PredictorDashboard: React.FC = () => {
                   : "text-white"
               }`}
             >
-              🍊 OJ TERMINAL 2.0
+              ORANGE TERMINAL 3.0 - LIVE
             </h1>
             {isFreezingAlert && (
               <span className="px-2 py-1 text-xs font-semibold bg-red-500/20 text-red-400 rounded-full border border-red-500/30 animate-pulse">
