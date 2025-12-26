@@ -95,7 +95,7 @@ async function fetchYahooFinancePrice(): Promise<PriceData | null> {
  */
 async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
   // Nuke the cache to ensure we never load old fake data
-  localStorage.removeItem('oj_price_data');
+  localStorage.removeItem(PRICE_STORAGE_KEY);
   
   try {
     const API_KEY = "R7pfPW0pIMaVvX2MwkycXEzJ0AFS3FA8";
