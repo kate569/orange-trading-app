@@ -237,7 +237,7 @@ export async function fetchOrangeJuicePrice(): Promise<PriceData | null> {
 
   // Return cached data if available (even if stale), otherwise null
   const cached = loadCachedPrice();
-  if (cached && cached.isLive) {
+  if (cached) {
     return cached;
   }
 

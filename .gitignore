@@ -1,8 +1,9 @@
 # Dependencies
 node_modules
 
-# Build outputs (keep dist for GitHub Pages deployment)
-# dist is intentionally tracked for deployment
+# Build outputs
+# Note: dist folder is intentionally tracked for GitHub Pages deployment
+# GitHub Pages serves directly from the dist folder in the repository
 
 # Environment variables
 .env
