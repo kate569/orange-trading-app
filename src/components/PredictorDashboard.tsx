@@ -18,6 +18,10 @@ import {
   fetchMarketContextData,
   MarketContextData,
 } from "../services/contextData";
+import {
+  fetchOrangeJuicePrice,
+  PriceData,
+} from "../services/priceService";
 import { NewsFeed } from "./NewsFeed";
 import { AnalystRationale } from "./AnalystRationale";
 import { PriceChart } from "./PriceChart";
@@ -1546,28 +1550,36 @@ export const PredictorDashboard: React.FC = () => {
     saveRsiValue(rsiValue);
   }, [rsiValue]);
 
-  // Fetch market context data on mount
+  // Fetch market context data and initial price on mount
   useEffect(() => {
-    const fetchContextData = async () => {
+    const fetchInitialData = async () => {
       setIsContextLoading(true);
       try {
-        const data = await fetchMarketContextData();
-        setContextData(data);
+        // Fetch context data and initial price in parallel
+        const [contextDataResult, priceData] = await Promise.all([
+          fetchMarketContextData(),
+          fetchOrangeJuicePrice(),
+        ]);
+        
+        setContextData(contextDataResult);
         
         // Update market context based on fetched data
         setMarketContext((prev) => ({
           ...prev,
-          isLaNina: data.laNina.isActive,
-          isHurricaneActive: data.hurricane.isActive,
+          isLaNina: contextDataResult.laNina.isActive,
+          isHurricaneActive: contextDataResult.hurricane.isActive,
         }));
+        
+        // Update current price with real data
+        setCurrentPrice(priceData.priceInCents);
       } catch (error) {
-        console.error("Failed to fetch context data:", error);
+        console.error("Failed to fetch initial data:", error);
       } finally {
         setIsContextLoading(false);
       }
     };
 
-    fetchContextData();
+    fetchInitialData();
   }, []);
 
   // Background timer for frost tracking
@@ -1698,10 +1710,11 @@ export const PredictorDashboard: React.FC = () => {
   const handleSyncLiveData = useCallback(async () => {
     setIsSyncing(true);
     try {
-      // Fetch both weather data and RSI in parallel
-      const [response, rsiResult]: [LiveWeatherResponse, RSIResult] = await Promise.all([
+      // Fetch weather data, RSI, and price data in parallel
+      const [response, rsiResult, priceData]: [LiveWeatherResponse, RSIResult, PriceData] = await Promise.all([
         fetchLiveMarketData(),
         fetchLiveMarketRSI(),
+        fetchOrangeJuicePrice(),
       ]);
       
       const syncTimestamp = Date.now();
@@ -1714,6 +1727,9 @@ export const PredictorDashboard: React.FC = () => {
       // Inventory and Hurricane settings are manual controls - don't override them
       setCurrentTemp(response.marketData.currentTemp);
       
+      // Update price from price service (uses Financial Modeling Prep with fallback)
+      setCurrentPrice(priceData.priceInCents);
+      
       // Update RSI from live market data
       if (!rsiResult.error) {
         setRsiValue(rsiResult.value);
@@ -1721,8 +1737,8 @@ export const PredictorDashboard: React.FC = () => {
         setRsiSyncError(undefined);
         // Also save to localStorage
         saveRsiValue(rsiResult.value);
-        // Update current price if available
-        if (rsiResult.currentPrice) {
+        // Use price from priceService (already set above), but fallback to RSI if needed
+        if (!priceData.isLive && rsiResult.currentPrice) {
           setCurrentPrice(rsiResult.currentPrice);
         }
       } else {

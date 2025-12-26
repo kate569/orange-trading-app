@@ -91,14 +91,63 @@ async function fetchYahooFinancePrice(): Promise<PriceData | null> {
 
 /**
  * Fetches price from Financial Modeling Prep API (alternative)
- * Note: Requires API key for full access, but we can try free tier
+ * Uses real API key with fallback to mock data on error
  */
 async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
   try {
-    // Using a free/public endpoint if available
-    // For production, you'd use: https://financialmodelingprep.com/api/v3/quote/OJ
-    // But that requires an API key, so we'll use Yahoo as primary
-    return null;
+    const API_KEY = "R7pfPW0pIMaVvX2MwkycXEzJ0AFS3FA8";
+    const url = `https://financialmodelingprep.com/api/v3/quote/OJ?apikey=${API_KEY}`;
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`Financial Modeling Prep API returned status ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    // Check if we got an error response (like "Upgrade Required")
+    if (data.error || data.message || !Array.isArray(data) || data.length === 0) {
+      console.warn("Financial Modeling Prep API error or empty response:", data.error || data.message || "No data");
+      return null;
+    }
+
+    const quote = data[0];
+    
+    // Validate we have the required data
+    if (!quote || typeof quote.price !== 'number') {
+      console.warn("Invalid quote data from Financial Modeling Prep");
+      return null;
+    }
+
+    // FMP returns price in dollars per pound for OJ futures
+    // We need to convert to cents for consistency
+    const priceInDollars = quote.price;
+    const priceInCents = priceInDollars * 100;
+    
+    const previousCloseInDollars = quote.previousClose || priceInDollars;
+    const previousCloseInCents = previousCloseInDollars * 100;
+    
+    const changeInDollars = quote.change || 0;
+    const changeInCents = changeInDollars * 100;
+    
+    const changePercent = quote.changesPercentage || 0;
+
+    return {
+      priceInCents,
+      priceInDollars,
+      previousClose: previousCloseInCents,
+      change: changeInCents,
+      changePercent,
+      timestamp: new Date(),
+      isLive: true,
+    };
   } catch (error) {
     console.warn("Financial Modeling Prep fetch failed:", error);
     return null;
@@ -178,12 +227,12 @@ export async function fetchOrangeJuicePrice(): Promise<PriceData> {
     return simulatePriceTicks(cached.priceInCents);
   }
 
-  // Try to fetch live data
-  let priceData = await fetchYahooFinancePrice();
+  // Try to fetch live data - Try Financial Modeling Prep first
+  let priceData = await fetchFinancialModelingPrepPrice();
   
   if (!priceData) {
-    // Try alternative source
-    priceData = await fetchFinancialModelingPrepPrice();
+    // Fallback to Yahoo Finance with CORS proxies
+    priceData = await fetchYahooFinancePrice();
   }
 
   if (priceData) {
