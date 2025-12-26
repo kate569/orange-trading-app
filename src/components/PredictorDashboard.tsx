@@ -1813,7 +1813,7 @@ export const PredictorDashboard: React.FC = () => {
   const isBrazilDroughtSeason = [8, 9, 10].includes(marketContext.currentMonth);
 
   return (
-    <div className="min-h-screen bg-slate-950 p-8">
+    <div className="min-h-screen bg-blue-950 p-8">
       {/* Toast Notification */}
       <Toast
         message={toastMessage}
