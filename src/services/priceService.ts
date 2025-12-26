@@ -94,6 +94,9 @@ async function fetchYahooFinancePrice(): Promise<PriceData | null> {
  * Uses real API key - returns null on error (no simulation fallback)
  */
 async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
+  // Nuke the cache to ensure we never load old fake data
+  localStorage.removeItem(PRICE_STORAGE_KEY);
+  
   try {
     const API_KEY = "R7pfPW0pIMaVvX2MwkycXEzJ0AFS3FA8";
     const url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=' + API_KEY);
@@ -112,13 +115,24 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
 
     const data = await response.json();
     
+    // Parse the AllOrigins response format: { contents: "..." }
+    let result;
+    try {
+      result = JSON.parse(data.contents);
+    } catch (parseError) {
+      console.warn("Failed to parse AllOrigins contents:", parseError);
+      return null;
+    }
+    
+    console.log('Real Data Fetch Result:', result);
+    
     // Check if we got an error response (like "Upgrade Required")
     if (data.error || data.message || !Array.isArray(data) || data.length === 0) {
       console.error("Financial Modeling Prep API error or empty response:", data.error || data.message || "No data");
       return null;
     }
 
-    const quote = data[0];
+    const quote = result[0];
     
     // Validate we have the required data
     if (!quote || typeof quote.price !== 'number') {
