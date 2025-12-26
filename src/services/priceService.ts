@@ -97,7 +97,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
   try {
     const API_KEY = 'R7pfPW0pIMaVvX2MwkycXEzJ0AFS3FA8'.trim();
     const symbol = 'OJ';
-    const url = 'https://corsproxy.io/?' + encodeURIComponent('https://financialmodelingprep.com/api/v3/quote/' + symbol + '?apikey=' + API_KEY);
+    const url = 'https://financialmodelingprep.com/api/v3/quote/' + symbol + '?apikey=' + API_KEY;
     
     console.log('Fetching URL:', url);
     
