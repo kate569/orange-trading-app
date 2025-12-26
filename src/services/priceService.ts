@@ -91,12 +91,12 @@ async function fetchYahooFinancePrice(): Promise<PriceData | null> {
 
 /**
  * Fetches price from Financial Modeling Prep API (alternative)
- * Uses real API key with fallback to mock data on error
+ * Uses real API key - returns null on error (no simulation fallback)
  */
 async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
   try {
     const API_KEY = "R7pfPW0pIMaVvX2MwkycXEzJ0AFS3FA8";
-    const url = 'https://corsproxy.io/?' + encodeURIComponent('https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=' + API_KEY);
+    const url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=' + API_KEY);
     
     const response = await fetch(url, {
       method: "GET",
@@ -106,9 +106,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     });
 
     if (!response.ok) {
-      const errorMsg = `Financial Modeling Prep API returned status ${response.status}`;
-      console.warn(errorMsg);
-      alert(errorMsg);
+      console.error(`Financial Modeling Prep API returned status ${response.status}`);
       return null;
     }
 
@@ -116,9 +114,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     
     // Check if we got an error response (like "Upgrade Required")
     if (data.error || data.message || !Array.isArray(data) || data.length === 0) {
-      const errorMsg = `API Error: ${data.error || data.message || "No data returned"}`;
-      console.warn("Financial Modeling Prep API error or empty response:", data.error || data.message || "No data");
-      alert(errorMsg);
+      console.error("Financial Modeling Prep API error or empty response:", data.error || data.message || "No data");
       return null;
     }
 
@@ -126,9 +122,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     
     // Validate we have the required data
     if (!quote || typeof quote.price !== 'number') {
-      const errorMsg = "Invalid quote data from Financial Modeling Prep";
-      console.warn(errorMsg);
-      alert(errorMsg);
+      console.error("Invalid quote data from Financial Modeling Prep");
       return null;
     }
 
@@ -155,9 +149,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
       isLive: true,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn("Financial Modeling Prep fetch failed:", error);
-    alert('API Error: ' + errorMessage);
+    console.error("Financial Modeling Prep fetch failed:", error);
     return null;
   }
 }
@@ -225,16 +217,10 @@ function saveCachedPrice(data: PriceData): void {
 
 /**
  * Fetches the latest Orange Juice Futures price
- * Tries live data first, falls back to cached, then simulated
+ * Tries live data first, falls back to cached data only
+ * NO SIMULATION - returns null if real data unavailable
  */
-export async function fetchOrangeJuicePrice(): Promise<PriceData> {
-  // Try to use cached data first (if fresh)
-  const cached = loadCachedPrice();
-  if (cached && cached.isLive) {
-    // If we have fresh live data, add micro-ticks for UI liveliness
-    return simulatePriceTicks(cached.priceInCents);
-  }
-
+export async function fetchOrangeJuicePrice(): Promise<PriceData | null> {
   // Try to fetch live data - Try Financial Modeling Prep first
   let priceData = await fetchFinancialModelingPrepPrice();
   
@@ -249,27 +235,15 @@ export async function fetchOrangeJuicePrice(): Promise<PriceData> {
     return priceData;
   }
 
-  // Fallback: Use cached data even if stale, or use default
-  if (cached) {
-    // Add micro-ticks to stale cached data
-    return simulatePriceTicks(cached.priceInCents);
+  // Return cached data if available (even if stale), otherwise null
+  const cached = loadCachedPrice();
+  if (cached && cached.isLive) {
+    return cached;
   }
 
-  // Ultimate fallback: Use a reasonable default price
-  // Historical OJ futures typically trade between $2.50-$4.50/lb
-  const defaultPriceInCents = 350.00; // $3.50/lb
-  const fallbackData: PriceData = {
-    priceInCents: defaultPriceInCents,
-    priceInDollars: defaultPriceInCents / 100,
-    previousClose: defaultPriceInCents,
-    change: 0,
-    changePercent: 0,
-    timestamp: new Date(),
-    isLive: false,
-  };
-
-  saveCachedPrice(fallbackData);
-  return fallbackData;
+  // No real data available - return null to show "Data Unavailable"
+  console.error("Unable to fetch real price data from any source");
+  return null;
 }
 
 /**
@@ -296,7 +270,7 @@ export function formatPriceChange(priceData: PriceData): string {
  * Returns a function to unsubscribe
  */
 export function subscribeToPriceUpdates(
-  callback: (priceData: PriceData) => void,
+  callback: (priceData: PriceData | null) => void,
   intervalMs: number = 5000 // Update every 5 seconds
 ): () => void {
   let isActive = true;
@@ -310,6 +284,7 @@ export function subscribeToPriceUpdates(
       callback(priceData);
     } catch (error) {
       console.error("Failed to update price:", error);
+      callback(null);
     }
   };
 

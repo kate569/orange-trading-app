@@ -1570,8 +1570,12 @@ export const PredictorDashboard: React.FC = () => {
           isHurricaneActive: contextDataResult.hurricane.isActive,
         }));
         
-        // Update current price with real data
-        setCurrentPrice(priceData.priceInCents);
+        // Update current price with real data if available
+        if (priceData) {
+          setCurrentPrice(priceData.priceInCents);
+        } else {
+          console.warn("No real price data available - using default");
+        }
       } catch (error) {
         console.error("Failed to fetch initial data:", error);
       } finally {
@@ -1711,7 +1715,7 @@ export const PredictorDashboard: React.FC = () => {
     setIsSyncing(true);
     try {
       // Fetch weather data, RSI, and price data in parallel
-      const [response, rsiResult, priceData]: [LiveWeatherResponse, RSIResult, PriceData] = await Promise.all([
+      const [response, rsiResult, priceData]: [LiveWeatherResponse, RSIResult, PriceData | null] = await Promise.all([
         fetchLiveMarketData(),
         fetchLiveMarketRSI(),
         fetchOrangeJuicePrice(),
@@ -1727,8 +1731,10 @@ export const PredictorDashboard: React.FC = () => {
       // Inventory and Hurricane settings are manual controls - don't override them
       setCurrentTemp(response.marketData.currentTemp);
       
-      // Update price from price service (uses Financial Modeling Prep with fallback)
-      setCurrentPrice(priceData.priceInCents);
+      // Update price from price service if available
+      if (priceData) {
+        setCurrentPrice(priceData.priceInCents);
+      }
       
       // Update RSI from live market data
       if (!rsiResult.error) {
@@ -1738,7 +1744,7 @@ export const PredictorDashboard: React.FC = () => {
         // Also save to localStorage
         saveRsiValue(rsiResult.value);
         // Use price from priceService (already set above), but fallback to RSI if needed
-        if (!priceData.isLive && rsiResult.currentPrice) {
+        if ((!priceData || !priceData.isLive) && rsiResult.currentPrice) {
           setCurrentPrice(rsiResult.currentPrice);
         }
       } else {
