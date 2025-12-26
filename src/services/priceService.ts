@@ -94,9 +94,12 @@ async function fetchYahooFinancePrice(): Promise<PriceData | null> {
  * Uses real API key with fallback to mock data on error
  */
 async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
+  // Nuke the cache to ensure we never load old fake data
+  localStorage.removeItem('oj_price_data');
+  
   try {
     const API_KEY = "R7pfPW0pIMaVvX2MwkycXEzJ0AFS3FA8";
-    const url = 'https://corsproxy.io/?' + encodeURIComponent('https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=' + API_KEY);
+    const url = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=' + API_KEY);
     
     const response = await fetch(url, {
       method: "GET",
@@ -114,15 +117,26 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
 
     const data = await response.json();
     
+    // Parse the AllOrigins response format: { contents: "..." }
+    let result;
+    try {
+      result = JSON.parse(data.contents);
+    } catch (parseError) {
+      console.warn("Failed to parse AllOrigins contents:", parseError);
+      return null;
+    }
+    
+    console.log('Real Data Fetch Result:', result);
+    
     // Check if we got an error response (like "Upgrade Required")
-    if (data.error || data.message || !Array.isArray(data) || data.length === 0) {
-      const errorMsg = `API Error: ${data.error || data.message || "No data returned"}`;
-      console.warn("Financial Modeling Prep API error or empty response:", data.error || data.message || "No data");
+    if (result.error || result.message || !Array.isArray(result) || result.length === 0) {
+      const errorMsg = `API Error: ${result.error || result.message || "No data returned"}`;
+      console.warn("Financial Modeling Prep API error or empty response:", result.error || result.message || "No data");
       alert(errorMsg);
       return null;
     }
 
-    const quote = data[0];
+    const quote = result[0];
     
     // Validate we have the required data
     if (!quote || typeof quote.price !== 'number') {
