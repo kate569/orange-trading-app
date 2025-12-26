@@ -186,22 +186,43 @@ function getVerdict(
 function calculateSlTp(
   price: number,
   recommendation: string
-): { sl: number; tp: number; signal: "BUY" | "SELL" | "HOLD" } | null {
+): { 
+  stopLoss: string; 
+  takeProfit: string; 
+  riskDistance: string; 
+  rewardDistance: string; 
+  riskRewardRatio: string;
+  signal: "BUY" | "SELL" | "HOLD" 
+} | null {
   const action = recommendation.toUpperCase();
 
   if (action.includes("BUY") || action.includes("LONG") || action.includes("DOUBLE")) {
+    const sl = price * 0.97; // -3%
+    const tp = price * 1.06; // +6%
+    const riskDist = price - sl;
+    const rewardDist = tp - price;
     return {
       signal: "BUY",
-      sl: price * 0.97, // -3%
-      tp: price * 1.06, // +6%
+      stopLoss: sl.toFixed(2),
+      takeProfit: tp.toFixed(2),
+      riskDistance: riskDist.toFixed(2),
+      rewardDistance: rewardDist.toFixed(2),
+      riskRewardRatio: (rewardDist / riskDist).toFixed(2) + ":1",
     };
   }
 
   if (action.includes("SELL") || action.includes("SHORT") || action.includes("REDUCE")) {
+    const sl = price * 1.03; // +3%
+    const tp = price * 0.94; // -6%
+    const riskDist = sl - price;
+    const rewardDist = price - tp;
     return {
       signal: "SELL",
-      sl: price * 1.03, // +3%
-      tp: price * 0.94, // -6%
+      stopLoss: sl.toFixed(2),
+      takeProfit: tp.toFixed(2),
+      riskDistance: riskDist.toFixed(2),
+      rewardDistance: rewardDist.toFixed(2),
+      riskRewardRatio: (rewardDist / riskDist).toFixed(2) + ":1",
     };
   }
 
@@ -354,6 +375,7 @@ export const AnalystRationale: React.FC<AnalystRationaleProps> = ({
         </div>
 
         {/* Risk Management */}
+        {slTp && (
         <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
           <div className="flex items-center gap-2 mb-3">
             <span>⚠️</span>
@@ -397,6 +419,7 @@ export const AnalystRationale: React.FC<AnalystRationaleProps> = ({
             </div>
           </div>
         </div>
+        )}
 
         {/* The Verdict */}
         <div

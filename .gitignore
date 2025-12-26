@@ -1,7 +1,32 @@
+# Dependencies
 node_modules
-.DS_Store
-*.log
+
+# Build outputs
+# Note: dist folder is intentionally tracked for GitHub Pages deployment
+# GitHub Pages serves directly from the dist folder in the repository
+
+# Environment variables
 .env
 .env.local
-.vite
+.env.production.local
+.env.development.local
+
+# Vite cache
 node_modules/.vite
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
