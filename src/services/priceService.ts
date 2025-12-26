@@ -155,31 +155,6 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
 }
 
 /**
- * Simulates micro-ticking updates based on previous close
- * Creates realistic price movement for UI liveliness
- */
-function simulatePriceTicks(basePrice: number): PriceData {
-  // Generate small random variation (±0.5% max)
-  const variation = (Math.random() - 0.5) * 0.01; // ±0.5%
-  const tickedPrice = basePrice * (1 + variation);
-  
-  // Round to 2 decimal places (cents precision)
-  const priceInCents = Math.round(tickedPrice * 100) / 100;
-  const change = priceInCents - basePrice;
-  const changePercent = (change / basePrice) * 100;
-
-  return {
-    priceInCents,
-    priceInDollars: priceInCents / 100,
-    previousClose: basePrice,
-    change,
-    changePercent,
-    timestamp: new Date(),
-    isLive: false, // This is simulated
-  };
-}
-
-/**
  * Loads cached price data from localStorage
  */
 function loadCachedPrice(): PriceData | null {
