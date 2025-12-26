@@ -106,7 +106,9 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     });
 
     if (!response.ok) {
-      console.warn(`Financial Modeling Prep API returned status ${response.status}`);
+      const errorMsg = `Financial Modeling Prep API returned status ${response.status}`;
+      console.warn(errorMsg);
+      alert(errorMsg);
       return null;
     }
 
@@ -114,7 +116,9 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     
     // Check if we got an error response (like "Upgrade Required")
     if (data.error || data.message || !Array.isArray(data) || data.length === 0) {
+      const errorMsg = `API Error: ${data.error || data.message || "No data returned"}`;
       console.warn("Financial Modeling Prep API error or empty response:", data.error || data.message || "No data");
+      alert(errorMsg);
       return null;
     }
 
@@ -122,7 +126,9 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     
     // Validate we have the required data
     if (!quote || typeof quote.price !== 'number') {
-      console.warn("Invalid quote data from Financial Modeling Prep");
+      const errorMsg = "Invalid quote data from Financial Modeling Prep";
+      console.warn(errorMsg);
+      alert(errorMsg);
       return null;
     }
 
@@ -149,7 +155,9 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
       isLive: true,
     };
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.warn("Financial Modeling Prep fetch failed:", error);
+    alert('API Error: ' + errorMessage);
     return null;
   }
 }
