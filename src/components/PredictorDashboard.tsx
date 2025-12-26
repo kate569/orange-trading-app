@@ -21,6 +21,7 @@ import {
 import { NewsFeed } from "./NewsFeed";
 import { AnalystRationale } from "./AnalystRationale";
 import { PriceChart } from "./PriceChart";
+import { Footer } from "./Footer";
 
 // localStorage keys for persistence
 const FROST_STORAGE_KEY = "oj_frost_tracker";
@@ -1529,6 +1530,10 @@ export const PredictorDashboard: React.FC = () => {
 
   // Current price state (OJ=F futures price)
   const [currentPrice, setCurrentPrice] = useState<number>(350); // Default fallback price
+
+  // Market context data state
+  const [contextData, setContextData] = useState<MarketContextData | null>(null);
+  const [isContextLoading, setIsContextLoading] = useState<boolean>(false);
 
   // Check if data is stale
   const dataIsStale = useMemo(
