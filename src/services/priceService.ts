@@ -96,7 +96,7 @@ async function fetchYahooFinancePrice(): Promise<PriceData | null> {
 async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
   try {
     const API_KEY = 'R7pfPW0pIMaVvX2MwkycXEzJ0AFS3FA8'.trim();
-    const symbol = 'AAPL';
+    const symbol = 'OJ';
     const url = 'https://corsproxy.io/?' + encodeURIComponent('https://financialmodelingprep.com/api/v3/quote/' + symbol + '?apikey=' + API_KEY);
     
     console.log('Fetching URL:', url);
@@ -109,9 +109,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     });
 
     if (!response.ok) {
-      const errorMsg = `Financial Modeling Prep API returned status ${response.status}`;
-      console.warn(errorMsg);
-      alert(errorMsg);
+      console.warn(`Financial Modeling Prep API returned status ${response.status}`);
       return null;
     }
 
@@ -119,9 +117,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     
     // Check if we got an error response (like "Upgrade Required")
     if (data.error || data.message || !Array.isArray(data) || data.length === 0) {
-      const errorMsg = `API Error: ${data.error || data.message || "No data returned"}`;
       console.warn("Financial Modeling Prep API error or empty response:", data.error || data.message || "No data");
-      alert(errorMsg);
       return null;
     }
 
@@ -129,9 +125,7 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
     
     // Validate we have the required data
     if (!quote || typeof quote.price !== 'number') {
-      const errorMsg = "Invalid quote data from Financial Modeling Prep";
-      console.warn(errorMsg);
-      alert(errorMsg);
+      console.warn("Invalid quote data from Financial Modeling Prep");
       return null;
     }
 
@@ -158,10 +152,19 @@ async function fetchFinancialModelingPrepPrice(): Promise<PriceData | null> {
       isLive: true,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.warn("Financial Modeling Prep fetch failed:", error);
-    alert('API Error: ' + errorMessage);
-    return null;
+    console.warn('API limit reached or error, switching to simulation.');
+    
+    // Return mock data immediately
+    const defaultPriceInCents = 350.00; // $3.50/lb - typical OJ futures price
+    return {
+      priceInCents: defaultPriceInCents,
+      priceInDollars: defaultPriceInCents / 100,
+      previousClose: defaultPriceInCents,
+      change: 0,
+      changePercent: 0,
+      timestamp: new Date(),
+      isLive: false,
+    };
   }
 }
 
